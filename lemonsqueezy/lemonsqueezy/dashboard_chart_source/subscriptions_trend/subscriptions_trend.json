@@ -1,11 +1,13 @@
 {
-    "creation": "2025-11-26 10:00:00.000000",
-    "docstatus": 0,
-    "doctype": "Dashboard Chart Source",
-    "modified": "2025-11-26 10:00:00.000000",
-    "modified_by": "Administrator",
-    "name": "Subscriptions Trend",
-    "owner": "Administrator",
-    "source_name": "Subscriptions Trend",
-    "timeseries": 0
+ "creation": "2025-11-26 10:00:00",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2025-11-26 15:07:22.089205",
+ "modified_by": "Administrator",
+ "module": "LemonSqueezy",
+ "name": "Subscriptions Trend",
+ "owner": "Administrator",
+ "source_name": "Subscriptions Trend",
+ "timeseries": 0
 }

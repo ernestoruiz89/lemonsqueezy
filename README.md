@@ -279,18 +279,6 @@ Contributions are welcome. Please:
 
 ---
 
-## ✨ Future Improvements
-
-- [ ] Metrics dashboard
-- [ ] Product management from Frappe
-- [ ] Automated tests
-- [ ] Integrated customer portal
-- [ ] Improved multi-currency support
-- [ ] Scheduled tasks for synchronization
-- [ ] Retry mechanism for failed webhooks
-
----
-
 ## 📝 Changelog
 
 ### v0.0.1 (Initial Release)

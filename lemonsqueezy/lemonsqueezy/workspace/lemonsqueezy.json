@@ -1,37 +1,5 @@
 {
-    "name": "LemonSqueezy",
-    "title": "LemonSqueezy",
-    "icon": "octicon octicon-credit-card",
-    "category": "Modules",
-    "extends_another_page": 0,
-    "is_hidden": 0,
-    "label": "LemonSqueezy",
-    "onboard": 0,
-    "public": 1,
-    "restrict_to_domain": "",
-    "shortcuts": [
-        {
-            "label": "LemonSqueezy Settings",
-            "link_to": "LemonSqueezy Settings",
-            "type": "DocType"
-        },
-        {
-            "label": "Subscriptions",
-            "link_to": "LemonSqueezy Subscription",
-            "type": "DocType"
-        },
-        {
-            "label": "Webhook Logs",
-            "link_to": "LemonSqueezy Webhook Log",
-            "type": "DocType"
-        },
-        {
-            "label": "New Subscription",
-            "link_to": "LemonSqueezy Subscription",
-            "type": "DocType",
-            "doc_view": "New"
-        }
-    ],
+    "app": "lemonsqueezy",
     "charts": [
         {
             "chart_name": "Subscriptions Trend",
@@ -42,29 +10,55 @@
             "label": "Distribution by Status"
         }
     ],
+    "content": "[{\"id\":\"active_subs\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Active Subscriptions\",\"col\":3}},{\"id\":\"new_month\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"New This Month\",\"col\":3}},{\"id\":\"cancelled_month\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Cancelled This Month\",\"col\":3}},{\"id\":\"total_subs\",\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Subscriptions\",\"col\":3}},{\"id\":\"subs_trend_chart\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscriptions Trend\",\"col\":6}},{\"id\":\"dist_chart\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscription Distribution\",\"col\":6}},{\"id\":\"header_transactions\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Transactions</b></span>\",\"col\":12}},{\"id\":\"card_transactions\",\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":6}},{\"id\":\"header_config\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Configuration</b></span>\",\"col\":12}},{\"id\":\"card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":6}}]",
+    "creation": "2025-11-26 15:00:00.000000",
+    "custom_blocks": [],
+    "docstatus": 0,
+    "doctype": "Workspace",
+    "for_user": "",
+    "hide_custom": 0,
+    "icon": "credit-card",
+    "idx": 0,
+    "indicator_color": "",
+    "is_hidden": 0,
+    "label": "LemonSqueezy",
     "links": [
         {
             "hidden": 0,
             "is_query_report": 0,
             "label": "Transactions",
-            "link_to": "",
-            "link_type": "DocType",
+            "link_count": 0,
             "onboard": 0,
             "type": "Card Break"
         },
         {
+            "dependencies": "",
             "hidden": 0,
             "is_query_report": 0,
-            "label": "Subscriptions",
+            "label": "LemonSqueezy Subscription",
+            "link_count": 0,
             "link_to": "LemonSqueezy Subscription",
             "link_type": "DocType",
             "onboard": 0,
             "type": "Link"
         },
         {
+            "dependencies": "",
             "hidden": 0,
             "is_query_report": 0,
-            "label": "Webhook Logs",
+            "label": "LemonSqueezy Order",
+            "link_count": 0,
+            "link_to": "LemonSqueezy Order",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Link"
+        },
+        {
+            "dependencies": "",
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "LemonSqueezy Webhook Log",
+            "link_count": 0,
             "link_to": "LemonSqueezy Webhook Log",
             "link_type": "DocType",
             "onboard": 0,
@@ -74,61 +68,89 @@
             "hidden": 0,
             "is_query_report": 0,
             "label": "Configuration",
-            "link_to": "",
-            "link_type": "DocType",
+            "link_count": 0,
             "onboard": 0,
             "type": "Card Break"
         },
         {
+            "dependencies": "",
             "hidden": 0,
             "is_query_report": 0,
             "label": "LemonSqueezy Settings",
+            "link_count": 0,
             "link_to": "LemonSqueezy Settings",
             "link_type": "DocType",
             "onboard": 0,
             "type": "Link"
         }
     ],
+    "modified": "2025-11-26 15:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "LemonSqueezy",
     "number_cards": [
         {
             "label": "Active Subscriptions",
-            "stats_filter": "{\"status\": [\"in\", [\"active\", \"on_trial\"]]}",
-            "document_type": "LemonSqueezy Subscription",
-            "function": "Count",
-            "aggregate_function_based_on": "",
-            "is_public": 1,
-            "show_percentage_stats": 1,
-            "stats_time_interval": "Monthly"
+            "number_card_name": "Active Subscriptions"
         },
         {
             "label": "New This Month",
-            "stats_filter": "{}",
-            "document_type": "LemonSqueezy Subscription",
-            "function": "Count",
-            "aggregate_function_based_on": "",
-            "is_public": 1,
-            "show_percentage_stats": 1,
-            "stats_time_interval": "Monthly"
+            "number_card_name": "New This Month"
         },
         {
             "label": "Cancelled This Month",
-            "stats_filter": "{\"status\": [\"in\", [\"cancelled\", \"expired\"]]}",
-            "document_type": "LemonSqueezy Subscription",
-            "function": "Count",
-            "aggregate_function_based_on": "",
-            "is_public": 1,
-            "show_percentage_stats": 1,
-            "stats_time_interval": "Monthly"
+            "number_card_name": "Cancelled This Month"
         },
         {
             "label": "Total Subscriptions",
-            "stats_filter": "{}",
-            "document_type": "LemonSqueezy Subscription",
-            "function": "Count",
-            "aggregate_function_based_on": "",
-            "is_public": 1,
-            "show_percentage_stats": 0,
-            "stats_time_interval": "Monthly"
+            "number_card_name": "Total Subscriptions"
         }
-    ]
+    ],
+    "owner": "Administrator",
+    "parent_page": "",
+    "public": 1,
+    "quick_lists": [],
+    "restrict_to_domain": "",
+    "roles": [],
+    "sequence_id": 15.0,
+    "shortcuts": [
+        {
+            "color": "Grey",
+            "doc_view": "List",
+            "format": "{} Open",
+            "label": "LemonSqueezy Settings",
+            "link_to": "LemonSqueezy Settings",
+            "stats_filter": "{}",
+            "type": "DocType"
+        },
+        {
+            "color": "Grey",
+            "doc_view": "List",
+            "format": "{} Open",
+            "label": "Subscriptions",
+            "link_to": "LemonSqueezy Subscription",
+            "stats_filter": "{}",
+            "type": "DocType"
+        },
+        {
+            "color": "Grey",
+            "doc_view": "List",
+            "format": "{} Open",
+            "label": "Orders",
+            "link_to": "LemonSqueezy Order",
+            "stats_filter": "{}",
+            "type": "DocType"
+        },
+        {
+            "color": "Grey",
+            "doc_view": "List",
+            "format": "{} Open",
+            "label": "Webhook Logs",
+            "link_to": "LemonSqueezy Webhook Log",
+            "stats_filter": "{}",
+            "type": "DocType"
+        }
+    ],
+    "title": "LemonSqueezy",
+    "type": "Workspace"
 }

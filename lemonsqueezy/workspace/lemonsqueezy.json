@@ -1,0 +1,134 @@
+{
+    "name": "LemonSqueezy",
+    "title": "LemonSqueezy",
+    "icon": "octicon octicon-credit-card",
+    "category": "Modules",
+    "extends_another_page": 0,
+    "is_hidden": 0,
+    "label": "LemonSqueezy",
+    "onboard": 0,
+    "public": 1,
+    "restrict_to_domain": "",
+    "shortcuts": [
+        {
+            "label": "LemonSqueezy Settings",
+            "link_to": "LemonSqueezy Settings",
+            "type": "DocType"
+        },
+        {
+            "label": "Subscriptions",
+            "link_to": "LemonSqueezy Subscription",
+            "type": "DocType"
+        },
+        {
+            "label": "Webhook Logs",
+            "link_to": "LemonSqueezy Webhook Log",
+            "type": "DocType"
+        },
+        {
+            "label": "New Subscription",
+            "link_to": "LemonSqueezy Subscription",
+            "type": "DocType",
+            "doc_view": "New"
+        }
+    ],
+    "charts": [
+        {
+            "chart_name": "Subscriptions Trend",
+            "label": "Subscriptions Trend (Last 6 Months)"
+        },
+        {
+            "chart_name": "Subscription Distribution",
+            "label": "Distribution by Status"
+        }
+    ],
+    "links": [
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Transactions",
+            "link_to": "",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Card Break"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Subscriptions",
+            "link_to": "LemonSqueezy Subscription",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Link"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Webhook Logs",
+            "link_to": "LemonSqueezy Webhook Log",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Link"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "Configuration",
+            "link_to": "",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Card Break"
+        },
+        {
+            "hidden": 0,
+            "is_query_report": 0,
+            "label": "LemonSqueezy Settings",
+            "link_to": "LemonSqueezy Settings",
+            "link_type": "DocType",
+            "onboard": 0,
+            "type": "Link"
+        }
+    ],
+    "number_cards": [
+        {
+            "label": "Active Subscriptions",
+            "stats_filter": "{\"status\": [\"in\", [\"active\", \"on_trial\"]]}",
+            "document_type": "LemonSqueezy Subscription",
+            "function": "Count",
+            "aggregate_function_based_on": "",
+            "is_public": 1,
+            "show_percentage_stats": 1,
+            "stats_time_interval": "Monthly"
+        },
+        {
+            "label": "New This Month",
+            "stats_filter": "{}",
+            "document_type": "LemonSqueezy Subscription",
+            "function": "Count",
+            "aggregate_function_based_on": "",
+            "is_public": 1,
+            "show_percentage_stats": 1,
+            "stats_time_interval": "Monthly"
+        },
+        {
+            "label": "Cancelled This Month",
+            "stats_filter": "{\"status\": [\"in\", [\"cancelled\", \"expired\"]]}",
+            "document_type": "LemonSqueezy Subscription",
+            "function": "Count",
+            "aggregate_function_based_on": "",
+            "is_public": 1,
+            "show_percentage_stats": 1,
+            "stats_time_interval": "Monthly"
+        },
+        {
+            "label": "Total Subscriptions",
+            "stats_filter": "{}",
+            "document_type": "LemonSqueezy Subscription",
+            "function": "Count",
+            "aggregate_function_based_on": "",
+            "is_public": 1,
+            "show_percentage_stats": 0,
+            "stats_time_interval": "Monthly"
+        }
+    ]
+}

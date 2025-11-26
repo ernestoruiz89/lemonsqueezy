@@ -1,0 +1,11 @@
+{
+    "creation": "2025-11-26 10:00:00.000000",
+    "docstatus": 0,
+    "doctype": "Dashboard Chart Source",
+    "modified": "2025-11-26 10:00:00.000000",
+    "modified_by": "Administrator",
+    "name": "Subscriptions Trend",
+    "owner": "Administrator",
+    "source_name": "Subscriptions Trend",
+    "timeseries": 0
+}

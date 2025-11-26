@@ -1,0 +1,92 @@
+{% extends "templates/web.html" %}
+
+{% block title %} {{ title }} {% endblock %}
+
+{% block header %}
+<script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
+{% endblock %}
+
+{% block page_content %}
+<div class="page-content-wrapper">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center">
+                <h3>{{ _("Complete your payment") }}</h3>
+
+                {% if error %}
+                <div class="alert alert-danger mt-4">
+                    <strong>{{ _("Error") }}:</strong> {{ error }}
+                </div>
+                <a href="javascript:history.back()" class="btn btn-secondary mt-3">
+                    <i class="fa fa-arrow-left"></i> {{ _("Go Back") }}
+                </a>
+                {% else %}
+                <div id="loading-state" class="mt-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">{{ _("Loading...") }}</span>
+                    </div>
+                    <p class="mt-2">{{ _("Preparing your checkout...") }}</p>
+                </div>
+
+                <div id="checkout-button" style="display: none;">
+                    <p>{{ _("Click the button below to proceed to payment.") }}</p>
+
+                    <a href="{{ checkout_url }}" class="btn btn-primary btn-lg lemonsqueezy-button mt-3">
+                        <i class="fa fa-credit-card"></i> {{ _("Pay with LemonSqueezy") }}
+                    </a>
+                </div>
+
+                <script>
+                    // Show checkout button after loading
+                    setTimeout(function () {
+                        document.getElementById('loading-state').style.display = 'none';
+                        document.getElementById('checkout-button').style.display = 'block';
+                    }, 500);
+
+                    window.createLemonSqueezy = function () {
+                        window.LemonSqueezy.Setup({
+                            eventHandler: (event) => {
+                                console.log('LemonSqueezy event:', event);
+
+                                if (event.event === "Checkout.Success") {
+                                    // Redirect to standard payment success page
+                                    let redirectUrl = "/payment-success";
+                                    const referenceDoctype = "{{ reference_doctype or '' }}";
+                                    const referenceDocname = "{{ reference_docname or '' }}";
+
+                                    if (referenceDoctype && referenceDocname) {
+                                        redirectUrl += `?doctype=${encodeURIComponent(referenceDoctype)}&docname=${encodeURIComponent(referenceDocname)}`;
+                                    }
+
+                                    window.location.href = redirectUrl;
+                                } else if (event.event === "Checkout.Closed") {
+                                    // User closed the checkout
+                                    console.log('Checkout closed by user');
+                                    if (typeof frappe !== 'undefined' && frappe.show_alert) {
+                                        frappe.show_alert({
+                                            message: __('Payment cancelled'),
+                                            indicator: 'orange'
+                                        }, 5);
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Initialize LemonSqueezy when script loads
+                    if (window.LemonSqueezy) {
+                        createLemonSqueezy();
+                    } else {
+                        window.addEventListener('load', function () {
+                            if (window.LemonSqueezy) {
+                                createLemonSqueezy();
+                            }
+                        });
+                    }
+                </script>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

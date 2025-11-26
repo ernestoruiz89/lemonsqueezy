@@ -1,0 +1,225 @@
+{
+    "actions": [],
+    "autoname": "format:ORD-{order_id}",
+    "creation": "2025-11-26 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "status",
+        "customer",
+        "customer_email",
+        "section_break_order_info",
+        "order_id",
+        "subscription_id",
+        "subscription",
+        "column_break_order_info",
+        "order_date",
+        "refunded_at",
+        "first_order",
+        "section_break_product",
+        "product_id",
+        "variant_id",
+        "product_name",
+        "variant_name",
+        "section_break_amounts",
+        "total",
+        "subtotal",
+        "column_break_amounts",
+        "discount_total",
+        "tax",
+        "currency",
+        "section_break_subscription",
+        "is_subscription",
+        "billing_interval",
+        "billing_interval_count"
+    ],
+    "fields": [
+        {
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "pending\\npaid\\nrefunded\\nfailed",
+            "reqd": 1,
+            "in_list_view": 1
+        },
+        {
+            "fieldname": "customer",
+            "fieldtype": "Link",
+            "label": "Customer",
+            "options": "Customer"
+        },
+        {
+            "fieldname": "customer_email",
+            "fieldtype": "Data",
+            "label": "Customer Email",
+            "in_list_view": 1
+        },
+        {
+            "fieldname": "section_break_order_info",
+            "fieldtype": "Section Break",
+            "label": "Order Information"
+        },
+        {
+            "fieldname": "order_id",
+            "fieldtype": "Data",
+            "label": "Order ID",
+            "read_only": 1,
+            "unique": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "subscription_id",
+            "fieldtype": "Data",
+            "label": "Subscription ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "subscription",
+            "fieldtype": "Link",
+            "label": "Subscription",
+            "options": "LemonSqueezy Subscription"
+        },
+        {
+            "fieldname": "column_break_order_info",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "order_date",
+            "fieldtype": "Datetime",
+            "label": "Order Date",
+            "reqd": 1,
+            "in_list_view": 1
+        },
+        {
+            "fieldname": "refunded_at",
+            "fieldtype": "Datetime",
+            "label": "Refunded At",
+            "read_only": 1
+        },
+        {
+            "fieldname": "first_order",
+            "fieldtype": "Check",
+            "label": "First Order",
+            "default": "0"
+        },
+        {
+            "fieldname": "section_break_product",
+            "fieldtype": "Section Break",
+            "label": "Product Details"
+        },
+        {
+            "fieldname": "product_id",
+            "fieldtype": "Data",
+            "label": "Product ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "variant_id",
+            "fieldtype": "Data",
+            "label": "Variant ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "product_name",
+            "fieldtype": "Data",
+            "label": "Product Name",
+            "in_list_view": 1
+        },
+        {
+            "fieldname": "variant_name",
+            "fieldtype": "Data",
+            "label": "Variant Name"
+        },
+        {
+            "fieldname": "section_break_amounts",
+            "fieldtype": "Section Break",
+            "label": "Amounts"
+        },
+        {
+            "fieldname": "total",
+            "fieldtype": "Currency",
+            "label": "Total",
+            "reqd": 1,
+            "in_list_view": 1
+        },
+        {
+            "fieldname": "subtotal",
+            "fieldtype": "Currency",
+            "label": "Subtotal"
+        },
+        {
+            "fieldname": "column_break_amounts",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "discount_total",
+            "fieldtype": "Currency",
+            "label": "Discount Total",
+            "default": "0"
+        },
+        {
+            "fieldname": "tax",
+            "fieldtype": "Currency",
+            "label": "Tax",
+            "default": "0"
+        },
+        {
+            "fieldname": "currency",
+            "fieldtype": "Link",
+            "label": "Currency",
+            "options": "Currency",
+            "default": "USD"
+        },
+        {
+            "fieldname": "section_break_subscription",
+            "fieldtype": "Section Break",
+            "label": "Subscription Info"
+        },
+        {
+            "fieldname": "is_subscription",
+            "fieldtype": "Check",
+            "label": "Is Subscription Order",
+            "default": "0"
+        },
+        {
+            "fieldname": "billing_interval",
+            "fieldtype": "Select",
+            "label": "Billing Interval",
+            "options": "\\nmonthly\\nyearly\\nweekly",
+            "depends_on": "eval:doc.is_subscription==1"
+        },
+        {
+            "fieldname": "billing_interval_count",
+            "fieldtype": "Int",
+            "label": "Billing Interval Count",
+            "default": "1",
+            "depends_on": "eval:doc.is_subscription==1"
+        }
+    ],
+    "issingle": 0,
+    "links": [],
+    "modified": "2025-11-26 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "LemonSqueezy Order",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1,
+    "title_field": "product_name"
+}

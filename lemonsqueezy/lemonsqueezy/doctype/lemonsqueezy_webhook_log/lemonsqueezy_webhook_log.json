@@ -1,0 +1,66 @@
+{
+    "actions": [],
+    "autoname": "format:WH-{event_name}-{MM}-{DD}-{####}",
+    "creation": "2023-11-26 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "event_name",
+        "status",
+        "error_message",
+        "payload"
+    ],
+    "fields": [
+        {
+            "fieldname": "event_name",
+            "fieldtype": "Data",
+            "label": "Event Name",
+            "read_only": 1
+        },
+        {
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "Success\nFailed",
+            "read_only": 1
+        },
+        {
+            "fieldname": "error_message",
+            "fieldtype": "Text",
+            "label": "Error Message",
+            "read_only": 1
+        },
+        {
+            "fieldname": "payload",
+            "fieldtype": "Code",
+            "label": "Payload",
+            "options": "JSON",
+            "read_only": 1
+        }
+    ],
+    "issingle": 0,
+    "links": [],
+    "modified": "2023-11-26 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "LemonSqueezy Webhook Log",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 0
+}

@@ -1,0 +1,156 @@
+{
+    "actions": [],
+    "autoname": "format:SUB-{subscription_id}",
+    "creation": "2023-11-26 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "status",
+        "customer",
+        "customer_email",
+        "section_break_details",
+        "subscription_id",
+        "order_id",
+        "product_id",
+        "variant_id",
+        "product_name",
+        "variant_name",
+        "column_break_dates",
+        "renews_at",
+        "ends_at",
+        "trial_ends_at",
+        "section_break_urls",
+        "update_url",
+        "cancel_url"
+    ],
+    "fields": [
+        {
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "active\npast_due\nunpaid\ncancelled\nexpired\non_trial\npaused",
+            "reqd": 1
+        },
+        {
+            "fieldname": "customer",
+            "fieldtype": "Link",
+            "label": "Customer",
+            "options": "Customer"
+        },
+        {
+            "fieldname": "customer_email",
+            "fieldtype": "Data",
+            "label": "Customer Email",
+            "read_only": 1
+        },
+        {
+            "fieldname": "section_break_details",
+            "fieldtype": "Section Break",
+            "label": "Subscription Details"
+        },
+        {
+            "fieldname": "subscription_id",
+            "fieldtype": "Data",
+            "label": "Subscription ID",
+            "read_only": 1,
+            "unique": 1
+        },
+        {
+            "fieldname": "order_id",
+            "fieldtype": "Data",
+            "label": "Order ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "product_id",
+            "fieldtype": "Data",
+            "label": "Product ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "variant_id",
+            "fieldtype": "Data",
+            "label": "Variant ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "product_name",
+            "fieldtype": "Data",
+            "label": "Product Name",
+            "read_only": 1
+        },
+        {
+            "fieldname": "variant_name",
+            "fieldtype": "Data",
+            "label": "Variant Name",
+            "read_only": 1
+        },
+        {
+            "fieldname": "column_break_dates",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "renews_at",
+            "fieldtype": "Datetime",
+            "label": "Renews At",
+            "read_only": 1
+        },
+        {
+            "fieldname": "ends_at",
+            "fieldtype": "Datetime",
+            "label": "Ends At",
+            "read_only": 1
+        },
+        {
+            "fieldname": "trial_ends_at",
+            "fieldtype": "Datetime",
+            "label": "Trial Ends At",
+            "read_only": 1
+        },
+        {
+            "fieldname": "section_break_urls",
+            "fieldtype": "Section Break",
+            "label": "URLs"
+        },
+        {
+            "fieldname": "update_url",
+            "fieldtype": "Data",
+            "label": "Update URL",
+            "read_only": 1,
+            "hidden": 1
+        },
+        {
+            "fieldname": "cancel_url",
+            "fieldtype": "Data",
+            "label": "Cancel URL",
+            "read_only": 1,
+            "hidden": 1
+        }
+    ],
+    "issingle": 0,
+    "links": [],
+    "modified": "2023-11-26 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "LemonSqueezy Subscription",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1,
+    "title_field": "product_name"
+}

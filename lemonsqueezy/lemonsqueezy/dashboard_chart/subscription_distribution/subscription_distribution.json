@@ -4,7 +4,6 @@
     "creation": "2025-11-26 15:00:00.000000",
     "docstatus": 0,
     "doctype": "Dashboard Chart",
-    "dynamic_filters_json": "{}",
     "filters_json": "{}",
     "idx": 0,
     "is_public": 1,
@@ -16,9 +15,7 @@
     "number_of_groups": 0,
     "owner": "Administrator",
     "source": "Subscription Distribution",
-    "time_interval": "Yearly",
     "timeseries": 0,
-    "timespan": "Last Year",
     "type": "Donut",
     "use_report_chart": 0,
     "y_axis": []

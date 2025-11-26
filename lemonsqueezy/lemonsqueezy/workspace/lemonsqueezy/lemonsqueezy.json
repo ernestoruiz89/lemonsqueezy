@@ -7,9 +7,21 @@
         {
             "chart_name": "Subscription Distribution",
             "label": "Subscription Distribution"
+        },
+        {
+            "chart_name": "Revenue by Month",
+            "label": "Revenue by Month"
+        },
+        {
+            "chart_name": "Top Products",
+            "label": "Top Products"
+        },
+        {
+            "chart_name": "Revenue by Product",
+            "label": "Revenue by Product"
         }
     ],
-    "content": "[{\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscriptions Trend\",\"col\":6}},{\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscription Distribution\",\"col\":6}},{\"type\":\"spacer\",\"data\":{\"col\":12}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Your Shortcuts</b></span>\",\"col\":12}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Settings\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Subscription\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Order\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Webhook Log\",\"col\":3}},{\"type\":\"spacer\",\"data\":{\"col\":12}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports & Masters</b></span>\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":6}},{\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":6}}]",
+    "content": "[{\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Active Subscriptions\",\"col\":3}},{\"type\":\"number_card\",\"data\":{\"number_card_name\":\"New This Month\",\"col\":3}},{\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Cancelled This Month\",\"col\":3}},{\"type\":\"number_card\",\"data\":{\"number_card_name\":\"Total Subscriptions\",\"col\":3}},{\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscriptions Trend\",\"col\":6}},{\"type\":\"chart\",\"data\":{\"chart_name\":\"Subscription Distribution\",\"col\":6}},{\"type\":\"chart\",\"data\":{\"chart_name\":\"Revenue by Month\",\"col\":6}},{\"type\":\"chart\",\"data\":{\"chart_name\":\"Top Products\",\"col\":6}},{\"type\":\"spacer\",\"data\":{\"col\":12}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Your Shortcuts</b></span>\",\"col\":12}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Settings\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Subscription\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Order\",\"col\":3}},{\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LemonSqueezy Webhook Log\",\"col\":3}},{\"type\":\"spacer\",\"data\":{\"col\":12}},{\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports & Masters</b></span>\",\"col\":12}},{\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":6}},{\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":6}}]",
     "creation": "2025-11-26 15:00:00.000000",
     "custom_blocks": [],
     "docstatus": 0,
@@ -82,11 +94,28 @@
             "type": "Link"
         }
     ],
-    "modified": "2025-11-26 15:16:00.000000",
+    "modified": "2025-11-26 16:00:00.000000",
     "modified_by": "Administrator",
     "module": "LemonSqueezy",
     "name": "LemonSqueezy",
-    "number_cards": [],
+    "number_cards": [
+        {
+            "label": "Active Subscriptions",
+            "number_card_name": "Active Subscriptions"
+        },
+        {
+            "label": "New This Month",
+            "number_card_name": "New This Month"
+        },
+        {
+            "label": "Cancelled This Month",
+            "number_card_name": "Cancelled This Month"
+        },
+        {
+            "label": "Total Subscriptions",
+            "number_card_name": "Total Subscriptions"
+        }
+    ],
     "owner": "Administrator",
     "parent_page": "",
     "public": 1,

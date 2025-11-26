@@ -1,0 +1,21 @@
+{
+    "aggregate_function_based_on": "",
+    "creation": "2025-11-26 15:00:00.000000",
+    "docstatus": 0,
+    "doctype": "Number Card",
+    "document_type": "LemonSqueezy Subscription",
+    "dynamic_filters_json": "[]",
+    "filters_json": "{}",
+    "function": "Count",
+    "idx": 0,
+    "is_public": 1,
+    "is_standard": 1,
+    "label": "New This Month",
+    "modified": "2025-11-26 15:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "New This Month",
+    "owner": "Administrator",
+    "show_percentage_stats": 1,
+    "stats_time_interval": "Monthly"
+}

@@ -28,36 +28,70 @@
             "in_list_view": 1,
             "label": "Gateway Name",
             "reqd": 1,
-            {
-                "fieldname": "default_variant_id",
-                "fieldtype": "Data",
-                "label": "Default Variant ID",
-                "description": "Variant ID to use for generic payments (must support custom price if amount is variable)"
-            }
-        ],
-        "issingle": 0,
-        "links": [],
-        "modified": "2023-11-26 10:00:00.000000",
-        "modified_by": "Administrator",
-        "module": "LemonSqueezy",
-        "name": "LemonSqueezy Settings",
-        "owner": "Administrator",
-        "permissions": [
-            {
-                "create": 1,
-                "delete": 1,
-                "email": 1,
-                "export": 1,
-                "print": 1,
-                "read": 1,
-                "report": 1,
-                "role": "System Manager",
-                "share": 1,
-                "write": 1
-            }
-        ],
-        "sort_field": "modified",
-        "sort_order": "DESC",
-        "states": [],
-        "track_changes": 1
-    }
+            "description": "e.g. Standard, Subscription"
+        },
+        {
+            "fieldname": "section_break_credentials",
+            "fieldtype": "Section Break",
+            "label": "API Credentials"
+        },
+        {
+            "fieldname": "api_key",
+            "fieldtype": "Small Text",
+            "label": "API Key",
+            "reqd": 1
+        },
+        {
+            "fieldname": "store_id",
+            "fieldtype": "Data",
+            "label": "Store ID",
+            "reqd": 1
+        },
+        {
+            "fieldname": "column_break_credentials",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "webhook_secret",
+            "fieldtype": "Small Text",
+            "label": "Webhook Secret",
+            "description": "Secret for validating webhook signatures"
+        },
+        {
+            "fieldname": "section_break_settings",
+            "fieldtype": "Section Break",
+            "label": "Payment Settings"
+        },
+        {
+            "fieldname": "default_variant_id",
+            "fieldtype": "Data",
+            "label": "Default Variant ID",
+            "description": "Variant ID to use for generic payments (must support custom price if amount is variable)"
+        }
+    ],
+    "issingle": 0,
+    "links": [],
+    "modified": "2023-11-26 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "LemonSqueezy",
+    "name": "LemonSqueezy Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

@@ -38,7 +38,7 @@
             "fieldname": "status",
             "fieldtype": "Select",
             "label": "Status",
-            "options": "pending\\npaid\\nrefunded\\nfailed",
+            "options": "Pending\\nPaid\\nRefunded\\nFailed",
             "reqd": 1,
             "in_list_view": 1
         },
@@ -185,7 +185,7 @@
             "fieldname": "billing_interval",
             "fieldtype": "Select",
             "label": "Billing Interval",
-            "options": "\\nmonthly\\nyearly\\nweekly",
+            "options": "\\nMonthly\\nYearly\\nWeekly",
             "depends_on": "eval:doc.is_subscription==1"
         },
         {

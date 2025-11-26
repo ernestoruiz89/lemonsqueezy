@@ -1,0 +1,26 @@
+{
+    "name": "lemonsqueezy",
+    "version": "0.0.1",
+    "description": "LemonSqueezy Payment Integration for Frappe/ERPNext",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ernestoruiz89/lemonsqueezy.git"
+    },
+    "keywords": [
+        "frappe",
+        "erpnext",
+        "lemonsqueezy",
+        "payment",
+        "gateway"
+    ],
+    "author": "Ernesto Ruiz <eruiz@wbapps.com>",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/ernestoruiz89/lemonsqueezy/issues"
+    },
+    "homepage": "https://github.com/ernestoruiz89/lemonsqueezy#readme"
+}

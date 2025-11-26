@@ -5,17 +5,18 @@
     "doctype": "Number Card",
     "document_type": "LemonSqueezy Subscription",
     "dynamic_filters_json": "[]",
-    "filters_json": "{}",
+    "filters_json": "[[\"LemonSqueezy Subscription\",\"status\",\"in\",[\"active\",\"on_trial\"],false]]",
     "function": "Count",
     "idx": 0,
     "is_public": 1,
     "is_standard": 1,
-    "label": "Total Subscriptions",
+    "label": "Active Subscriptions",
     "modified": "2025-11-26 15:00:00.000000",
     "modified_by": "Administrator",
     "module": "LemonSqueezy",
-    "name": "Total Subscriptions",
+    "name": "Active Subscriptions",
     "owner": "Administrator",
-    "show_percentage_stats": 0,
-    "stats_time_interval": "Monthly"
+    "show_percentage_stats": 1,
+    "stats_time_interval": "Monthly",
+    "type": "Document Type"
 }

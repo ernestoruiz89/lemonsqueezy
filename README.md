@@ -22,11 +22,11 @@
 # Navigate to the bench directory
 cd frappe-bench
 
-# Get the app (adjust the path according to your configuration)
-bench get-app /path/to/lemonsqueezy
+# Get the app from GitHub
+bench get-app https://github.com/ernestoruiz89/lemonsqueezy.git
 
-# Install the app on your site
-bench --site [site-name] install-app lemonsqueezy
+# Install the app on your site (skip assets since this app has no frontend JS/CSS)
+bench --site [site-name] install-app lemonsqueezy --skip-assets
 
 # Migrate
 bench --site [site-name] migrate

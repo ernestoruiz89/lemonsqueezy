@@ -74,7 +74,7 @@ def handle_webhook():
 		frappe.local.response['http_status_code'] = 400
 		return {"status": "error", "message": "Invalid JSON"}
 		
-	event_name = data.get("met", {}).get("event_name")
+	event_name = data.get("meta", {}).get("event_name")
 	
 	# Validate event is supported
 	if event_name not in SUPPORTED_EVENTS:

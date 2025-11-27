@@ -368,6 +368,23 @@ def lemonsqueezy_checkout(**kwargs):
 							ref_dt = pr.reference_doctype
 							ref_dn = pr.reference_name
 
+				# Handle Sales Invoice reference
+				if ref_dt == "Sales Invoice":
+					# Try to find linked subscription
+					sub_name = frappe.db.get_value("Sales Invoice", ref_dn, "subscription")
+					if sub_name:
+						ref_dt = "Subscription"
+						ref_dn = sub_name
+					else:
+						# Or check items for subscription plan
+						items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["subscription_plan"])
+						if items and items[0].subscription_plan:
+							plan_id = items[0].subscription_plan
+							variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+							if variant_id:
+								kwargs["variant_id"] = variant_id
+								frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
+
 				if ref_dt == "Subscription":
 					# Get plan from Subscription
 					# 'plans' is a child table in Subscription

@@ -301,6 +301,26 @@ def process_subscription_event(data, settings, event_name):
 	if cancel_url:
 		doc.cancel_url = cancel_url
 	
+	# Financials (from payment events or if available)
+	if "total" in attributes:
+		doc.total = (attributes.get("total") or 0) / 100
+	if "subtotal" in attributes:
+		doc.subtotal = (attributes.get("subtotal") or 0) / 100
+	if "tax" in attributes:
+		doc.tax = (attributes.get("tax") or 0) / 100
+	if "currency" in attributes:
+		doc.currency = (attributes.get("currency") or "USD").upper()
+		
+	# Billing Interval
+	if variant_name:
+		variant_lower = variant_name.lower()
+		if "month" in variant_lower:
+			doc.billing_interval = "Monthly"
+		elif "year" in variant_lower:
+			doc.billing_interval = "Yearly"
+		elif "week" in variant_lower:
+			doc.billing_interval = "Weekly"
+
 	# Try to link to a Customer if email matches
 	if not doc.customer and user_email:
 		customer = frappe.db.get_value("Customer", {"email_id": user_email}, "name")

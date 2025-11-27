@@ -338,7 +338,12 @@ def lemonsqueezy_checkout(**kwargs):
 	"""
 	try:
 		# Get settings
-		settings = frappe.get_doc("LemonSqueezy Settings")
+		# Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
+		settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
+		if not settings_name:
+			frappe.throw(_("No enabled LemonSqueezy Settings found"))
+			
+		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
 		
 		# Generate the checkout URL
 		# kwargs contains arguments passed from Payment Request

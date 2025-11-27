@@ -364,18 +364,18 @@ def lemonsqueezy_checkout(**kwargs):
         Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
         """
         try:
-                if not kwargs.get("variant_id") and not (
-                        kwargs.get("reference_doctype") and kwargs.get("reference_docname")
-                ):
-                        frappe.throw(_("A valid reference or variant_id is required to start checkout."))
-
                 # Get settings
                 # Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
                 settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
                 if not settings_name:
                         frappe.throw(_("No enabled LemonSqueezy Settings found"))
-			
-		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+
+                settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+
+                if not kwargs.get("variant_id") and not settings.default_variant_id and not (
+                        kwargs.get("reference_doctype") and kwargs.get("reference_docname")
+                ):
+                        frappe.throw(_("A valid reference or variant_id is required to start checkout."))
 		
 		# Try to find Variant ID from Reference Document (Subscription Plan)
 		if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):

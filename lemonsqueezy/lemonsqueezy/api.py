@@ -357,6 +357,6 @@ def lemonsqueezy_checkout(**kwargs):
 			
 	except Exception as e:
 		error_msg = str(e)
-		# Log without explicit title to avoid length issues
-		frappe.log_error(f"LemonSqueezy Checkout Error: {error_msg[:300]}")
+		# Use explicit title and message to avoid length issues
+		frappe.log_error(message=f"LemonSqueezy Checkout Error: {error_msg[:500]}", title="LemonSqueezy Checkout Error")
 		frappe.throw(_("Error initiating checkout. Please check Error Log for details."))

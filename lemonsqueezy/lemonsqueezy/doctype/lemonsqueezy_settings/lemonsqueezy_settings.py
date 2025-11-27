@@ -4,7 +4,6 @@ import json
 from frappe import _
 from frappe.utils import get_url, cint, flt
 from urllib.parse import urlencode
-from frappe.integrations.utils import create_payment_gateway
 from frappe.integrations.doctype.payment_gateway.payment_gateway import PaymentGateway
 
 # LemonSqueezy supported currencies
@@ -91,19 +90,6 @@ class LemonSqueezySettings(PaymentGateway):
 						currency, ", ".join(SUPPORTED_CURRENCIES[:10]) + "..."
 					)
 				)
-
-	def on_update(self):
-		"""Create/update Payment Gateway after saving"""
-		try:
-			create_payment_gateway(
-				"LemonSqueezy-" + self.gateway_name,
-				settings="LemonSqueezy Settings",
-				controller=self.gateway_name,
-			)
-			frappe.db.commit()
-		except Exception as e:
-			# Log error but don't fail - Gateway Controller might not exist yet
-			frappe.log_error(f"Could not create Payment Gateway: {str(e)}", "LemonSqueezy Settings")
 
 	def get_payment_url(self, **kwargs):
 		"""

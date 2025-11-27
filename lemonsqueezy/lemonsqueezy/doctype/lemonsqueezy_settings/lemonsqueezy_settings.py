@@ -68,7 +68,7 @@ class LemonSqueezySettings(Document):
 		"""
 		Returns the URL to the local checkout page.
 		"""
-		return get_url(f"./lemonsqueezy_checkout?{urlencode(kwargs)}")
+		return get_url(f"/api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout?{urlencode(kwargs)}")
 
 	def get_api_checkout_url(self, **kwargs):
 		"""

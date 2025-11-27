@@ -1,11 +1,11 @@
 import frappe
 import requests
 import json
-from frappe.model.document import Document
 from frappe import _
 from frappe.utils import get_url, cint, flt
 from urllib.parse import urlencode
 from frappe.integrations.utils import create_payment_gateway
+from frappe.integrations.doctype.payment_gateway.payment_gateway import PaymentGateway
 
 # LemonSqueezy supported currencies
 SUPPORTED_CURRENCIES = [
@@ -24,7 +24,8 @@ SUPPORTED_CURRENCIES = [
 	"UZS", "VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW"
 ]
 
-class LemonSqueezySettings(Document):
+class LemonSqueezySettings(PaymentGateway):
+	supported_currencies = SUPPORTED_CURRENCIES
 	def validate(self):
 		"""Validate settings before saving"""
 		if self.api_key and self.store_id:

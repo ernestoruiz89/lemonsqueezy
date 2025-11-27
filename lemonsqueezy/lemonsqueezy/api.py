@@ -164,7 +164,8 @@ def process_order_created(data, settings):
 		order_doc.currency = (attributes.get("currency") or "USD").upper()
 		
 		# Dates
-		order_doc.order_date = get_datetime(attributes.get("created_at"))
+		dt = get_datetime(attributes.get("created_at"))
+		order_doc.order_date = dt.replace(tzinfo=None) if dt else None
 		
 		# Product info
 		first_item = attributes.get("first_order_item", {})
@@ -274,11 +275,14 @@ def process_subscription_event(data, settings, event_name):
 		doc.order_id = str(order_id)
 	
 	if renews_at:
-		doc.renews_at = get_datetime(renews_at)
+		dt = get_datetime(renews_at)
+		doc.renews_at = dt.replace(tzinfo=None) if dt else None
 	if ends_at:
-		doc.ends_at = get_datetime(ends_at)
+		dt = get_datetime(ends_at)
+		doc.ends_at = dt.replace(tzinfo=None) if dt else None
 	if trial_ends_at:
-		doc.trial_ends_at = get_datetime(trial_ends_at)
+		dt = get_datetime(trial_ends_at)
+		doc.trial_ends_at = dt.replace(tzinfo=None) if dt else None
 		
 	if update_url:
 		doc.update_url = update_url

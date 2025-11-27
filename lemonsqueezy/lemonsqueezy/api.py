@@ -353,14 +353,6 @@ def lemonsqueezy_checkout(**kwargs):
 				
 				# If reference is Payment Request, get the actual reference (Subscription/Invoice)
 				if ref_dt == "Payment Request":
-					# We might be in a Payment Request context already, but let's be safe
-					# If the kwargs come from Payment Request, reference_doctype might already be the underlying doc
-					# But let's check if reference_doctype is indeed Payment Request
-					pass
-					
-				# If the Payment Request points to a Subscription directly (or via PR doc)
-				# Let's check the actual Payment Request document if we have the ID
-				if kwargs.get("reference_doctype") == "Payment Request":
 					pr_name = kwargs.get("reference_docname")
 					if frappe.db.exists("Payment Request", pr_name):
 						pr = frappe.db.get_value("Payment Request", pr_name, ["reference_doctype", "reference_name"], as_dict=1)
@@ -370,21 +362,32 @@ def lemonsqueezy_checkout(**kwargs):
 
 				# Handle Sales Invoice reference
 				if ref_dt == "Sales Invoice":
-					# Try to find linked subscription
-					sub_name = frappe.db.get_value("Sales Invoice", ref_dn, "subscription")
-					if sub_name:
-						ref_dt = "Subscription"
-						ref_dn = sub_name
-					else:
-						# Or check items for subscription plan
-						items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["subscription_plan"])
-						if items and items[0].subscription_plan:
-							plan_id = items[0].subscription_plan
-							variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
-							if variant_id:
-								kwargs["variant_id"] = variant_id
-								frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
+					# PRIORITY 1: Check if the Item has a specific LemonSqueezy Variant ID
+					items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["item_code"], limit=1)
+					if items:
+						item_code = items[0].item_code
+						# Check if this Item has a specific LemonSqueezy Variant ID
+						item_variant_id = frappe.db.get_value("Item", item_code, "lemonsqueezy_variant_id")
+						if item_variant_id:
+							kwargs["variant_id"] = item_variant_id
+							frappe.log_error(f"Found Variant ID {item_variant_id} from Item {item_code}", "LemonSqueezy Debug")
+						else:
+							# PRIORITY 2: No specific variant, check if it's a subscription-based invoice
+							sub_name = frappe.db.get_value("Sales Invoice", ref_dn, "subscription")
+							if sub_name:
+								ref_dt = "Subscription"
+								ref_dn = sub_name
+							else:
+								# PRIORITY 3: Check items for subscription plan
+								sub_items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["subscription_plan"])
+								if sub_items and sub_items[0].subscription_plan:
+									plan_id = sub_items[0].subscription_plan
+									variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+									if variant_id:
+										kwargs["variant_id"] = variant_id
+										frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
 
+				# Handle Subscription reference
 				if ref_dt == "Subscription":
 					# Get plan from Subscription
 					# 'plans' is a child table in Subscription

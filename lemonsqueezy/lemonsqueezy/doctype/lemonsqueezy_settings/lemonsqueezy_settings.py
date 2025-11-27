@@ -45,12 +45,17 @@ class LemonSqueezySettings(Document):
 			frappe.throw(_("Failed to validate credentials: {0}").format(str(e)))
 
 	def on_update(self):
-		create_payment_gateway(
-			"LemonSqueezy-" + self.gateway_name,
-			settings="LemonSqueezy Settings",
-			controller=self.gateway_name,
-		)
-		frappe.db.commit()
+		"""Create/update Payment Gateway after saving"""
+		try:
+			create_payment_gateway(
+				"LemonSqueezy-" + self.gateway_name,
+				settings="LemonSqueezy Settings",
+				controller=self.gateway_name,
+			)
+			frappe.db.commit()
+		except Exception as e:
+			# Log error but don't fail - Gateway Controller might not exist yet
+			frappe.log_error(f"Could not create Payment Gateway: {str(e)}", "LemonSqueezy Settings")
 
 	def get_payment_url(self, **kwargs):
 		"""

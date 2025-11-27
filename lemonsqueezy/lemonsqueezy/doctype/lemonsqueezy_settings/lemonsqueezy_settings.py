@@ -44,6 +44,13 @@ class LemonSqueezySettings(Document):
 			frappe.log_error(f"LemonSqueezy credential validation error: {str(e)}")
 			frappe.throw(_("Failed to validate credentials: {0}").format(str(e)))
 
+
+	def validate_transaction_currency(self, currency):
+		"""Validate transaction currency"""
+		# LemonSqueezy supports multiple currencies. 
+		# You can add specific validation logic here if needed.
+		pass
+
 	def on_update(self):
 		"""Create/update Payment Gateway after saving"""
 		try:

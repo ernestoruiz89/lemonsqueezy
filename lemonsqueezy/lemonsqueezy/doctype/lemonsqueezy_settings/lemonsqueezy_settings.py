@@ -68,7 +68,13 @@ class LemonSqueezySettings(Document):
 		"""
 		Returns the URL to the local checkout page.
 		"""
-		return get_url(f"/api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout?{urlencode(kwargs)}")
+		try:
+			url = get_url(f"/api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout?{urlencode(kwargs)}")
+			frappe.log_error(f"Generated Payment URL: {url}\nArgs: {kwargs}", "LemonSqueezy Debug")
+			return url
+		except Exception as e:
+			frappe.log_error(f"Error generating payment URL: {str(e)}", "LemonSqueezy Error")
+			return None
 
 	def get_api_checkout_url(self, **kwargs):
 		"""

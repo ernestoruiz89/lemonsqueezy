@@ -329,3 +329,27 @@ def process_subscription_event(data, settings, event_name):
 			
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
+
+@frappe.whitelist(allow_guest=True)
+def lemonsqueezy_checkout(**kwargs):
+	"""
+	Redirect to LemonSqueezy Checkout
+	Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
+	"""
+	try:
+		# Get settings
+		settings = frappe.get_doc("LemonSqueezy Settings")
+		
+		# Generate the checkout URL
+		# kwargs contains arguments passed from Payment Request
+		checkout_url = settings.get_api_checkout_url(**kwargs)
+		
+		if checkout_url:
+			frappe.local.response["type"] = "redirect"
+			frappe.local.response["location"] = checkout_url
+		else:
+			frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
+			
+	except Exception as e:
+		frappe.log_error(f"LemonSqueezy Checkout Error: {str(e)}")
+		frappe.throw(_("Error initiating checkout: {0}").format(str(e)))

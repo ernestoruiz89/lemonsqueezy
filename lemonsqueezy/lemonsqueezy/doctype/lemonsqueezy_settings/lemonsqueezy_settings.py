@@ -162,12 +162,12 @@ class LemonSqueezySettings(Document):
 			frappe.throw(_("Request timeout. Please try again."))
 		except requests.exceptions.HTTPError as e:
 			error_detail = e.response.text if hasattr(e.response, 'text') else str(e)
-			# Use static title and truncate message to avoid CharacterLengthExceededError
-			frappe.log_error(f"API Error: {error_detail[:500]}", "LemonSqueezy API Error")
+			# Log error without explicit title to avoid length issues
+			frappe.log_error(f"LemonSqueezy API Error: {error_detail[:300]}")
 			frappe.throw(_("Failed to create LemonSqueezy checkout. Please check Error Log for details."))
 		except Exception as e:
-			frappe.log_error(f"LemonSqueezy Error: {str(e)}")
-			frappe.throw(_("Failed to create LemonSqueezy checkout: {0}").format(str(e)))
+			frappe.log_error(f"LemonSqueezy Checkout Error: {str(e)[:300]}")
+			frappe.throw(_("Failed to create LemonSqueezy checkout. Please check Error Log."))
 
 	def get_customer_portal_url(self, subscription_id):
 		"""

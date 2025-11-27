@@ -356,5 +356,7 @@ def lemonsqueezy_checkout(**kwargs):
 			frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
 			
 	except Exception as e:
-		frappe.log_error(f"LemonSqueezy Checkout Error: {str(e)}")
-		frappe.throw(_("Error initiating checkout: {0}").format(str(e)))
+		error_msg = str(e)
+		# Truncate title to avoid CharacterLengthExceededError
+		frappe.log_error(error_msg, f"LemonSqueezy Checkout Error: {error_msg}"[:140])
+		frappe.throw(_("Error initiating checkout: {0}").format(error_msg))

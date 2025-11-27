@@ -14,7 +14,9 @@ SUPPORTED_EVENTS = [
 	"subscription_resumed",
 	"subscription_expired",
 	"subscription_paused",
-	"subscription_unpaused"
+	"subscription_unpaused",
+	"subscription_payment_success",
+	"subscription_payment_failed"
 ]
 
 @frappe.whitelist(allow_guest=True)
@@ -98,7 +100,7 @@ def handle_webhook():
 	try:
 		if event_name == "order_created":
 			process_order_created(data, valid_settings)
-		elif event_name in ["subscription_created", "subscription_updated", "subscription_cancelled", "subscription_resumed", "subscription_expired", "subscription_paused", "subscription_unpaused"]:
+		elif event_name in ["subscription_created", "subscription_updated", "subscription_cancelled", "subscription_resumed", "subscription_expired", "subscription_paused", "subscription_unpaused", "subscription_payment_success", "subscription_payment_failed"]:
 			process_subscription_event(data, valid_settings, event_name)
 			
 	except Exception as e:
@@ -151,7 +153,7 @@ def process_order_created(data, settings):
 		# Create new order
 		order_doc = frappe.new_doc("LemonSqueezy Order")
 		order_doc.order_id = order_id
-		order_doc.status = "paid"
+		order_doc.status = "Paid"
 		order_doc.customer_email = attributes.get("user_email")
 		
 		# Amounts (convert from cents to currency)
@@ -189,11 +191,11 @@ def process_order_created(data, settings):
 					# Try to detect interval from variant name
 					variant_lower = sub.variant_name.lower()
 					if "month" in variant_lower:
-						order_doc.billing_interval = "monthly"
+						order_doc.billing_interval = "Monthly"
 					elif "year" in variant_lower:
-						order_doc.billing_interval = "yearly"
+						order_doc.billing_interval = "Yearly"
 					elif "week" in variant_lower:
-						order_doc.billing_interval = "weekly"
+						order_doc.billing_interval = "Weekly"
 			except:
 				pass
 		

@@ -149,18 +149,25 @@ def get_churn_rate():
 def get_subscriptions_trend(months=6):
 	"""Get subscription trends for the last N months"""
 	months = int(months)
-	trend_data = []
+	
+	labels = []
+	new_data = []
+	active_data = []
+	cancelled_data = []
 	
 	for i in range(months - 1, -1, -1):
 		month_date = add_months(today(), -i)
 		first_day = get_first_day(month_date)
 		last_day = get_last_day(month_date)
 		
+		labels.append(getdate(month_date).strftime("%b %Y"))
+		
 		# New subscriptions this month
 		new_subs = frappe.db.count(
 			"LemonSqueezy Subscription",
 			filters={"creation": ["between", [first_day, last_day]]}
 		)
+		new_data.append(new_subs)
 		
 		# Active at end of month
 		active_subs = frappe.db.count(
@@ -170,6 +177,7 @@ def get_subscriptions_trend(months=6):
 				"creation": ["<=", last_day]
 			}
 		)
+		active_data.append(active_subs)
 		
 		# Cancelled this month
 		cancelled_subs = frappe.db.count(
@@ -179,15 +187,16 @@ def get_subscriptions_trend(months=6):
 				"modified": ["between", [first_day, last_day]]
 			}
 		)
+		cancelled_data.append(cancelled_subs)
 		
-		trend_data.append({
-			"month": getdate(month_date).strftime("%b %Y"),
-			"new": new_subs,
-			"active": active_subs,
-			"cancelled": cancelled_subs
-		})
-	
-	return trend_data
+	return {
+		"labels": labels,
+		"datasets": [
+			{"name": "New Subscriptions", "values": new_data},
+			{"name": "Active Subscriptions", "values": active_data},
+			{"name": "Cancelled Subscriptions", "values": cancelled_data}
+		]
+	}
 
 @frappe.whitelist()
 def get_subscription_distribution():
@@ -198,15 +207,19 @@ def get_subscription_distribution():
 		group_by="status"
 	)
 	
-	# Format for chart
-	distribution = []
-	for status in statuses:
-		distribution.append({
-			"name": status.status.replace("_", " ").title(),
-			"value": status.count
-		})
+	labels = []
+	values = []
 	
-	return distribution
+	for status in statuses:
+		labels.append(status.status.replace("_", " ").title())
+		values.append(status.count)
+	
+	return {
+		"labels": labels,
+		"datasets": [
+			{"name": "Subscriptions", "values": values}
+		]
+	}
 
 @frappe.whitelist()
 def get_top_products(limit=5):
@@ -226,19 +239,22 @@ def get_top_products(limit=5):
 		limit=limit
 	)
 	
-	# Format for display
-	top_products = []
+	labels = []
+	values = []
+	
 	for product in products:
 		name = product.product_name or "Unknown Product"
 		if product.variant_name:
 			name += f" - {product.variant_name}"
-		
-		top_products.append({
-			"name": name,
-			"count": product.count
-		})
+		labels.append(name)
+		values.append(product.count)
 	
-	return top_products
+	return {
+		"labels": labels,
+		"datasets": [
+			{"name": "Active Subscriptions", "values": values}
+		]
+	}
 
 @frappe.whitelist()
 def get_expiring_soon(days=30):
@@ -280,7 +296,7 @@ def get_mrr():
 			"LemonSqueezy Order",
 			filters={
 				"subscription_id": sub.subscription_id,
-				"status": "paid",
+				"status": "Paid",
 				"is_subscription": 1
 			},
 			fields=["name"],
@@ -314,7 +330,7 @@ def get_total_revenue():
 	result = frappe.db.sql("""
 		SELECT SUM(total) as total
 		FROM `tabLemonSqueezy Order`
-		WHERE status = 'paid'
+		WHERE status = 'Paid'
 	""", as_dict=1)
 	
 	total = result[0].total if result and result[0].total else 0
@@ -332,7 +348,7 @@ def get_revenue_this_month():
 	result = frappe.db.sql("""
 		SELECT SUM(total) as total
 		FROM `tabLemonSqueezy Order`
-		WHERE status = 'paid'
+		WHERE status = 'Paid'
 		AND order_date BETWEEN %s AND %s
 	""", (first_day, last_day), as_dict=1)
 	
@@ -345,7 +361,7 @@ def get_revenue_this_month():
 	prev_result = frappe.db.sql("""
 		SELECT SUM(total) as total
 		FROM `tabLemonSqueezy Order`
-		WHERE status = 'paid'
+		WHERE status = 'Paid'
 		AND order_date BETWEEN %s AND %s
 	""", (prev_month_first, prev_month_last), as_dict=1)
 	
@@ -367,28 +383,32 @@ def get_revenue_this_month():
 def get_revenue_by_month(months=6):
 	"""Get revenue trend by month"""
 	months = int(months)
-	revenue_data = []
+	labels = []
+	values = []
 	
 	for i in range(months - 1, -1, -1):
 		month_date = add_months(today(), -i)
 		first_day = get_first_day(month_date)
 		last_day = get_last_day(month_date)
 		
+		labels.append(getdate(month_date).strftime("%b %Y"))
+		
 		result = frappe.db.sql("""
 			SELECT SUM(total) as total
 			FROM `tabLemonSqueezy Order`
-			WHERE status = 'paid'
+			WHERE status = 'Paid'
 			AND order_date BETWEEN %s AND %s
 		""", (first_day, last_day), as_dict=1)
 		
 		revenue = result[0].total if result and result[0].total else 0
-		
-		revenue_data.append({
-			"month": getdate(month_date).strftime("%b %Y"),
-			"revenue": round(flt(revenue), 2)
-		})
+		values.append(round(flt(revenue), 2))
 	
-	return revenue_data
+	return {
+		"labels": labels,
+		"datasets": [
+			{"name": "Revenue", "values": values}
+		]
+	}
 
 @frappe.whitelist()
 def get_revenue_by_product(limit=5):
@@ -401,22 +421,26 @@ def get_revenue_by_product(limit=5):
 			SUM(total) as revenue,
 			COUNT(*) as order_count
 		FROM `tabLemonSqueezy Order`
-		WHERE status = 'paid'
+		WHERE status = 'Paid'
 		AND product_name IS NOT NULL
 		GROUP BY product_name
 		ORDER BY revenue DESC
 		LIMIT %s
 	""", limit, as_dict=1)
 	
-	products = []
-	for row in result:
-		products.append({
-			"name": row.product_name or "Unknown Product",
-			"revenue": round(flt(row.revenue), 2),
-			"order_count": row.order_count
-		})
+	labels = []
+	values = []
 	
-	return products
+	for row in result:
+		labels.append(row.product_name or "Unknown Product")
+		values.append(round(flt(row.revenue), 2))
+	
+	return {
+		"labels": labels,
+		"datasets": [
+			{"name": "Revenue", "values": values}
+		]
+	}
 
 @frappe.whitelist()
 def get_average_order_value():
@@ -424,7 +448,7 @@ def get_average_order_value():
 	result = frappe.db.sql("""
 		SELECT AVG(total) as avg_value
 		FROM `tabLemonSqueezy Order`
-		WHERE status = 'paid'
+		WHERE status = 'Paid'
 	""", as_dict=1)
 	
 	avg_value = result[0].avg_value if result and result[0].avg_value else 0

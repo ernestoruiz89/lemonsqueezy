@@ -7,33 +7,48 @@ from frappe.utils import get_datetime
 
 # Supported webhook events
 SUPPORTED_EVENTS = [
-	"order_created",
-	"subscription_created",
-	"subscription_updated",
-	"subscription_cancelled",
+        "order_created",
+        "subscription_created",
+        "subscription_updated",
+        "subscription_cancelled",
 	"subscription_resumed",
 	"subscription_expired",
 	"subscription_paused",
 	"subscription_unpaused",
-	"subscription_payment_success",
-	"subscription_payment_failed"
+        "subscription_payment_success",
+        "subscription_payment_failed"
 ]
+
+MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024  # 2MB safeguard to prevent oversized payloads
 
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
-	"""
-	Handle LemonSqueezy Webhooks
-	Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.handle_webhook
-	"""
+        """
+        Handle LemonSqueezy Webhooks
+        Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.handle_webhook
+        """
 	
 	# Get signature from headers
-	signature = frappe.request.headers.get("X-Signature")
-	if not signature:
-		frappe.log_error("No signature provided in LemonSqueezy webhook", "LemonSqueezy Webhook Error")
-		frappe.local.response['http_status_code'] = 401
-		return {"status": "error", "message": "No signature provided"}
-		
-	raw_body = frappe.request.get_data()
+        signature = frappe.request.headers.get("X-Signature")
+        if not signature:
+                frappe.log_error("No signature provided in LemonSqueezy webhook", "LemonSqueezy Webhook Error")
+                frappe.local.response['http_status_code'] = 401
+                return {"status": "error", "message": "No signature provided"}
+
+        raw_body = frappe.request.get_data()
+
+        if not raw_body:
+                frappe.log_error("Empty body received in LemonSqueezy webhook", "LemonSqueezy Webhook Error")
+                frappe.local.response['http_status_code'] = 400
+                return {"status": "error", "message": "Empty body"}
+
+        if len(raw_body) > MAX_WEBHOOK_BODY_BYTES:
+                frappe.log_error(
+                        f"Webhook body exceeded size limit ({len(raw_body)} bytes)",
+                        "LemonSqueezy Webhook Error",
+                )
+                frappe.local.response['http_status_code'] = 413
+                return {"status": "error", "message": "Payload too large"}
 	
 	# Find the correct settings doc that matches the signature
 	settings_list = frappe.get_all("LemonSqueezy Settings", fields=["name"], filters={"enabled": 1})
@@ -76,15 +91,27 @@ def handle_webhook():
 		frappe.local.response['http_status_code'] = 400
 		return {"status": "error", "message": "Invalid JSON"}
 		
-	# Debug: Log the full payload structure to understand format
-	frappe.log_error(f"Full webhook payload: {json.dumps(data, indent=2)}", "LemonSqueezy Webhook Debug")
+        # Log minimal context without storing full payload to avoid leaking sensitive data
+        meta = data.get("meta") or {}
+        frappe.log_error(
+                f"Received webhook event: {meta.get('event_name')} for store {meta.get('store_id')}",
+                "LemonSqueezy Webhook Debug",
+        )
+
+        event_name = data.get("meta", {}).get("event_name")
 	
-	event_name = data.get("meta", {}).get("event_name")
-	
-	# Validate event is supported
-	if event_name not in SUPPORTED_EVENTS:
-		frappe.log_error(f"Unsupported event type: {event_name}\\nPayload keys: {list(data.keys())}\\nMeta: {data.get('meta', {})}", "LemonSqueezy Webhook")
-		return {"status": "success", "message": "Event not supported"}
+        if not event_name:
+                frappe.log_error("Missing event_name in LemonSqueezy webhook metadata", "LemonSqueezy Webhook Error")
+                frappe.local.response['http_status_code'] = 400
+                return {"status": "error", "message": "Invalid event"}
+
+        # Validate event is supported
+        if event_name not in SUPPORTED_EVENTS:
+                frappe.log_error(
+                        f"Unsupported event type: {event_name}",
+                        "LemonSqueezy Webhook",
+                )
+                return {"status": "success", "message": "Event not supported"}
 	
 	# Create Webhook Log
 	log_doc = frappe.get_doc({
@@ -332,18 +359,23 @@ def process_subscription_event(data, settings, event_name):
 
 @frappe.whitelist(allow_guest=True)
 def lemonsqueezy_checkout(**kwargs):
-	"""
-	Redirect to LemonSqueezy Checkout
-	Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
-	"""
-	try:
-		# Get settings
-		# Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
-		settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
-		if not settings_name:
-			frappe.throw(_("No enabled LemonSqueezy Settings found"))
-			
-		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+        """
+        Redirect to LemonSqueezy Checkout
+        Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
+        """
+        try:
+                # Get settings
+                # Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
+                settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
+                if not settings_name:
+                        frappe.throw(_("No enabled LemonSqueezy Settings found"))
+
+                settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+
+                if not kwargs.get("variant_id") and not settings.default_variant_id and not (
+                        kwargs.get("reference_doctype") and kwargs.get("reference_docname")
+                ):
+                        frappe.throw(_("A valid reference or variant_id is required to start checkout."))
 		
 		# Try to find Variant ID from Reference Document (Subscription Plan)
 		if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):
@@ -351,14 +383,25 @@ def lemonsqueezy_checkout(**kwargs):
 				ref_dt = kwargs.get("reference_doctype")
 				ref_dn = kwargs.get("reference_docname")
 				
-				# If reference is Payment Request, get the actual reference (Subscription/Invoice)
-				if ref_dt == "Payment Request":
-					pr_name = kwargs.get("reference_docname")
-					if frappe.db.exists("Payment Request", pr_name):
-						pr = frappe.db.get_value("Payment Request", pr_name, ["reference_doctype", "reference_name"], as_dict=1)
-						if pr:
-							ref_dt = pr.reference_doctype
-							ref_dn = pr.reference_name
+                                # If reference is Payment Request, get the actual reference (Subscription/Invoice)
+                                if ref_dt == "Payment Request":
+                                        pr_name = kwargs.get("reference_docname")
+                                        if not frappe.db.exists("Payment Request", pr_name):
+                                                frappe.throw(_("Payment Request {0} was not found.").format(pr_name))
+
+                                        pr = frappe.db.get_value(
+                                                "Payment Request",
+                                                pr_name,
+                                                ["reference_doctype", "reference_name", "status"],
+                                                as_dict=1,
+                                        )
+
+                                        if pr:
+                                                if pr.status in ("Paid", "Cancelled"):
+                                                        frappe.throw(_("Payment Request {0} is not payable.").format(pr_name))
+
+                                                ref_dt = pr.reference_doctype
+                                                ref_dn = pr.reference_name
 
 				# Handle Sales Invoice reference
 				if ref_dt == "Sales Invoice":

@@ -130,13 +130,38 @@ class LemonSqueezySettings(Document):
 			"Content-Type": "application/vnd.api+json"
 		}
 		
+		# Build checkout_data only if we have valid data
+		checkout_data = {}
+		
+		# Add email if valid
+		payer_email = kwargs.get("payer_email")
+		if payer_email and "@" in payer_email and "." in payer_email:
+			checkout_data["email"] = payer_email
+		
+		# Add name if provided
+		if kwargs.get("payer_name"):
+			checkout_data["name"] = kwargs.get("payer_name")
+		
+		# Add custom data for tracking
+		if kwargs.get("reference_doctype") or kwargs.get("reference_docname") or kwargs.get("order_id"):
+			checkout_data["custom"] = {
+				"reference_doctype": kwargs.get("reference_doctype") or "",
+				"reference_docname": kwargs.get("reference_docname") or "",
+				"payment_request_id": kwargs.get("order_id") or ""
+			}
+		
+		# Handle custom price if amount is provided
+		amount = kwargs.get("amount")
+		if amount:
+			# LemonSqueezy expects amount in cents (integer)
+			amount_in_cents = cint(flt(amount) * 100)
+			checkout_data["custom_price"] = amount_in_cents
+		
 		# Construct payload
 		payload = {
 			"data": {
 				"type": "checkouts",
-				"attributes": {
-					"checkout_data": {}
-				},
+				"attributes": {},
 				"relationships": {
 					"store": {
 						"data": {
@@ -154,30 +179,9 @@ class LemonSqueezySettings(Document):
 			}
 		}
 		
-		# Add email and name if provided and valid
-		payer_email = kwargs.get("payer_email")
-		if payer_email and "@" in payer_email and "." in payer_email:
-			payload["data"]["attributes"]["checkout_data"]["email"] = payer_email
-		
-		if kwargs.get("payer_name"):
-			payload["data"]["attributes"]["checkout_data"]["name"] = kwargs.get("payer_name")
-		
-		# Add custom data for tracking
-		if kwargs.get("reference_doctype") or kwargs.get("reference_docname") or kwargs.get("order_id"):
-			payload["data"]["attributes"]["checkout_data"]["custom"] = {
-				"reference_doctype": kwargs.get("reference_doctype"),
-				"reference_docname": kwargs.get("reference_docname"),
-				"payment_request_id": kwargs.get("order_id")
-			}
-		
-		# Handle custom price if amount is provided
-		# Note: The variant must be configured to allow "Pay what you want" or custom price in LemonSqueezy dashboard
-		amount = kwargs.get("amount")
-		if amount:
-			# LemonSqueezy expects amount in cents (integer)
-			# Use cint and flt for proper conversion
-			amount_in_cents = cint(flt(amount) * 100)
-			payload["data"]["attributes"]["checkout_data"]["custom_price"] = amount_in_cents
+		# Only add checkout_data if we have something to send
+		if checkout_data:
+			payload["data"]["attributes"]["checkout_data"] = checkout_data
 			
 		try:
 			response = requests.post(

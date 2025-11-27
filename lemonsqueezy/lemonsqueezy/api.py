@@ -345,6 +345,44 @@ def lemonsqueezy_checkout(**kwargs):
 			
 		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
 		
+		# Try to find Variant ID from Reference Document (Subscription Plan)
+		if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):
+			try:
+				ref_dt = kwargs.get("reference_doctype")
+				ref_dn = kwargs.get("reference_docname")
+				
+				# If reference is Payment Request, get the actual reference (Subscription/Invoice)
+				if ref_dt == "Payment Request":
+					# We might be in a Payment Request context already, but let's be safe
+					# If the kwargs come from Payment Request, reference_doctype might already be the underlying doc
+					# But let's check if reference_doctype is indeed Payment Request
+					pass
+					
+				# If the Payment Request points to a Subscription directly (or via PR doc)
+				# Let's check the actual Payment Request document if we have the ID
+				if kwargs.get("reference_doctype") == "Payment Request":
+					pr_name = kwargs.get("reference_docname")
+					if frappe.db.exists("Payment Request", pr_name):
+						pr = frappe.db.get_value("Payment Request", pr_name, ["reference_doctype", "reference_name"], as_dict=1)
+						if pr:
+							ref_dt = pr.reference_doctype
+							ref_dn = pr.reference_name
+
+				if ref_dt == "Subscription":
+					# Get plan from Subscription
+					# 'plans' is a child table in Subscription
+					plans = frappe.get_all("Subscription Plan Detail", filters={"parent": ref_dn}, fields=["plan"])
+					if plans:
+						# Use the first plan found
+						plan_id = plans[0].plan
+						# Get product_price_id from Subscription Plan
+						variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+						if variant_id:
+							kwargs["variant_id"] = variant_id
+							frappe.log_error(f"Found Variant ID {variant_id} from Subscription Plan {plan_id}", "LemonSqueezy Debug")
+			except Exception as e:
+				frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
+
 		# Generate the checkout URL
 		# kwargs contains arguments passed from Payment Request
 		checkout_url = settings.get_api_checkout_url(**kwargs)

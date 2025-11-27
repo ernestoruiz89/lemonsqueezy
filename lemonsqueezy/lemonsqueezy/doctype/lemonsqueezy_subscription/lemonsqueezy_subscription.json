@@ -114,14 +114,14 @@
         },
         {
             "fieldname": "update_url",
-            "fieldtype": "Data",
+            "fieldtype": "Small Text",
             "label": "Update URL",
             "read_only": 1,
             "hidden": 1
         },
         {
             "fieldname": "cancel_url",
-            "fieldtype": "Data",
+            "fieldtype": "Small Text",
             "label": "Cancel URL",
             "read_only": 1,
             "hidden": 1

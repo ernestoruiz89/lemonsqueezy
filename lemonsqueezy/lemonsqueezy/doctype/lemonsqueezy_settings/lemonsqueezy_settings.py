@@ -135,13 +135,7 @@ class LemonSqueezySettings(Document):
 			"data": {
 				"type": "checkouts",
 				"attributes": {
-					"checkout_data": {
-						"custom": {
-							"reference_doctype": kwargs.get("reference_doctype"),
-							"reference_docname": kwargs.get("reference_docname"),
-							"payment_request_id": kwargs.get("order_id")
-						}
-					}
+					"checkout_data": {}
 				},
 				"relationships": {
 					"store": {
@@ -160,11 +154,21 @@ class LemonSqueezySettings(Document):
 			}
 		}
 		
-		# Add email and name if provided
-		if kwargs.get("payer_email"):
-			payload["data"]["attributes"]["checkout_data"]["email"] = kwargs.get("payer_email")
+		# Add email and name if provided and valid
+		payer_email = kwargs.get("payer_email")
+		if payer_email and "@" in payer_email and "." in payer_email:
+			payload["data"]["attributes"]["checkout_data"]["email"] = payer_email
+		
 		if kwargs.get("payer_name"):
 			payload["data"]["attributes"]["checkout_data"]["name"] = kwargs.get("payer_name")
+		
+		# Add custom data for tracking
+		if kwargs.get("reference_doctype") or kwargs.get("reference_docname") or kwargs.get("order_id"):
+			payload["data"]["attributes"]["checkout_data"]["custom"] = {
+				"reference_doctype": kwargs.get("reference_doctype"),
+				"reference_docname": kwargs.get("reference_docname"),
+				"payment_request_id": kwargs.get("order_id")
+			}
 		
 		# Handle custom price if amount is provided
 		# Note: The variant must be configured to allow "Pay what you want" or custom price in LemonSqueezy dashboard

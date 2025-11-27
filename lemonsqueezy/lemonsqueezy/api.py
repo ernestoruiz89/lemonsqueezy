@@ -214,16 +214,23 @@ def process_subscription_event(data, settings, event_name):
 	subscription_data = data.get("data", {})
 	attributes = subscription_data.get("attributes", {})
 	
-	subscription_id = subscription_data.get("id")
+	# Handle payment events where data is an invoice, not the subscription itself
+	if event_name in ["subscription_payment_success", "subscription_payment_failed"]:
+		subscription_id = str(attributes.get("subscription_id"))
+		# Invoice status is 'paid'/'pending'/'failed', not subscription status
+		# We don't update subscription status based on invoice status directly here
+		status = None 
+	else:
+		subscription_id = str(subscription_data.get("id"))
+		status = attributes.get("status")
+
 	if not subscription_id:
 		frappe.log_error("No subscription_id in webhook data")
 		return
 		
-	subscription_id = str(subscription_id)
 	customer_id = attributes.get("customer_id")
 	product_id = attributes.get("product_id")
 	variant_id = attributes.get("variant_id")
-	status = attributes.get("status")
 	
 	# Dates
 	renews_at = attributes.get("renews_at")
@@ -247,6 +254,11 @@ def process_subscription_event(data, settings, event_name):
 	if existing_name:
 		doc = frappe.get_doc("LemonSqueezy Subscription", existing_name)
 	else:
+		# If it's a payment event and subscription doesn't exist, we can't create it properly without status
+		if event_name in ["subscription_payment_success", "subscription_payment_failed"]:
+			frappe.log_error(f"Received {event_name} for unknown subscription {subscription_id}", "LemonSqueezy Webhook")
+			return {"status": "success", "message": "Subscription not found, skipping payment event"}
+			
 		doc = frappe.new_doc("LemonSqueezy Subscription")
 		doc.subscription_id = subscription_id
 		# Set required fields for new documents

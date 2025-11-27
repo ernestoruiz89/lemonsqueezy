@@ -1,10 +1,28 @@
 import frappe
+import requests
+import json
 from frappe.model.document import Document
 from frappe import _
-from payments.utils import create_payment_gateway
 from frappe.utils import get_url, cint, flt
 from urllib.parse import urlencode
-import requests
+from frappe.integrations.utils import create_payment_gateway
+
+# LemonSqueezy supported currencies
+SUPPORTED_CURRENCIES = [
+	"AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN",
+	"BAM", "BBD", "BDT", "BGN", "BIF", "BMD", "BND", "BOB", "BRL", "BSD",
+	"BWP", "BZD", "CAD", "CDF", "CHF", "CLP", "CNY", "COP", "CRC", "CVE",
+	"CZK", "DJF", "DKK", "DOP", "DZD", "EGP", "ETB", "EUR", "FJD", "FKP",
+	"GBP", "GEL", "GIP", "GMD", "GNF", "GTQ", "GYD", "HKD", "HNL", "HTG",
+	"HUF", "IDR", "ILS", "INR", "ISK", "JMD", "JPY", "KES", "KGS", "KHR",
+	"KMF", "KRW", "KYD", "KZT", "LAK", "LBP", "LKR", "LRD", "LSL", "MAD",
+	"MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MUR", "MVR", "MWK", "MXN",
+	"MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR", "NZD", "PAB", "PEN",
+	"PGK", "PHP", "PKR", "PLN", "PYG", "QAR", "RON", "RSD", "RWF", "SAR",
+	"SBD", "SCR", "SEK", "SGD", "SHP", "SLL", "SOS", "SRD", "SZL", "THB",
+	"TJS", "TOP", "TRY", "TTD", "TWD", "TZS", "UAH", "UGX", "USD", "UYU",
+	"UZS", "VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW"
+]
 
 class LemonSqueezySettings(Document):
 	def validate(self):
@@ -63,10 +81,15 @@ class LemonSqueezySettings(Document):
 				frappe.msgprint(_("Warning: Could not validate Variant ID: {0}").format(str(e)))
 
 	def validate_transaction_currency(self, currency):
-		"""Validate transaction currency"""
-		# LemonSqueezy supports multiple currencies. 
-		# You can add specific validation logic here if needed.
-		pass
+		"""Validate transaction currency against LemonSqueezy supported currencies"""
+		if currency:
+			currency = currency.upper()
+			if currency not in SUPPORTED_CURRENCIES:
+				frappe.throw(
+					_("Currency {0} is not supported by LemonSqueezy. Supported currencies: {1}").format(
+						currency, ", ".join(SUPPORTED_CURRENCIES[:10]) + "..."
+					)
+				)
 
 	def on_update(self):
 		"""Create/update Payment Gateway after saving"""
@@ -215,10 +238,10 @@ def get_customer_portal_url_api(subscription_id):
 	Whitelist method to get customer portal URL
 	Can be called from frontend
 	"""
-	# Get any LemonSqueezy Settings (or pass specific one)
-	settings = frappe.get_all("LemonSqueezy Settings", limit=1)
+	# Get any enabled LemonSqueezy Settings
+	settings = frappe.get_all("LemonSqueezy Settings", filters={"enabled": 1}, limit=1)
 	if not settings:
-		frappe.throw(_("No LemonSqueezy Settings found"))
+		frappe.throw(_("No enabled LemonSqueezy Settings found"))
 	
 	doc = frappe.get_doc("LemonSqueezy Settings", settings[0].name)
 	return doc.get_customer_portal_url(subscription_id)
@@ -227,10 +250,12 @@ def get_customer_portal_url_api(subscription_id):
 def test_connection(name):
 	"""
 	Test LemonSqueezy API connection
+	Called from Settings page
 	"""
-	doc = frappe.get_doc("LemonSqueezy Settings", name)
 	try:
+		doc = frappe.get_doc("LemonSqueezy Settings", name)
 		doc.validate_credentials()
-		return {"success": True, "message": "Connection successful"}
+		return {"success": True, "message": _("Connection successful!")}
 	except Exception as e:
-		frappe.throw(str(e))
+		return {"success": False, "message": str(e)}
+

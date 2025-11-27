@@ -44,6 +44,23 @@ class LemonSqueezySettings(Document):
 			frappe.log_error(f"LemonSqueezy credential validation error: {str(e)}")
 			frappe.throw(_("Failed to validate credentials: {0}").format(str(e)))
 
+		# Validate Default Variant ID if set
+		if self.default_variant_id:
+			try:
+				response = requests.get(
+					f"https://api.lemonsqueezy.com/v1/variants/{self.default_variant_id}",
+					headers=headers,
+					timeout=10
+				)
+				if response.status_code == 404:
+					frappe.throw(_("Default Variant ID {0} does not exist in LemonSqueezy.").format(self.default_variant_id))
+				response.raise_for_status()
+			except requests.exceptions.HTTPError as e:
+				if e.response.status_code == 404:
+					frappe.throw(_("Default Variant ID {0} does not exist in LemonSqueezy.").format(self.default_variant_id))
+				frappe.msgprint(_("Warning: Could not validate Variant ID: {0}").format(str(e)))
+			except Exception as e:
+				frappe.msgprint(_("Warning: Could not validate Variant ID: {0}").format(str(e)))
 
 	def validate_transaction_currency(self, currency):
 		"""Validate transaction currency"""

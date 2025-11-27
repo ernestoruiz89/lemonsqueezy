@@ -1,0 +1,33 @@
+[
+    {
+        "name": "Item-lemonsqueezy_variant_id",
+        "doctype": "Custom Field",
+        "dt": "Item",
+        "fieldname": "lemonsqueezy_variant_id",
+        "fieldtype": "Data",
+        "label": "LemonSqueezy Variant ID",
+        "insert_after": "max_discount",
+        "description": "LemonSqueezy Variant ID for this specific product. Leave blank to use default variant with custom price.",
+        "translatable": 0,
+        "read_only": 0,
+        "allow_on_submit": 0,
+        "depends_on": "",
+        "mandatory_depends_on": "",
+        "bold": 0,
+        "collapsible": 0,
+        "unique": 0,
+        "no_copy": 0,
+        "print_hide": 1,
+        "report_hide": 0,
+        "reqd": 0,
+        "ignore_user_permissions": 0,
+        "ignore_xss_filter": 0,
+        "in_global_search": 0,
+        "in_list_view": 0,
+        "in_preview": 0,
+        "in_standard_filter": 0,
+        "hidden": 0,
+        "is_system_generated": 0,
+        "is_virtual": 0
+    }
+]

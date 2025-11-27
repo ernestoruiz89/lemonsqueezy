@@ -7,6 +7,18 @@ app_description = "LemonSqueezy Payment Integration for Frappe"
 app_email = "eruiz@wbapps.com"
 app_license = "MIT"
 
+# Fixtures
+# --------
+# Install custom fields automatically
+fixtures = [
+	{
+		"dt": "Custom Field",
+		"filters": [
+			["name", "in", ["Item-lemonsqueezy_variant_id"]]
+		]
+	}
+]
+
 # Includes in <head>
 # ------------------
 

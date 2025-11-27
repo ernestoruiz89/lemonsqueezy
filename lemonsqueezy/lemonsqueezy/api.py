@@ -74,11 +74,14 @@ def handle_webhook():
 		frappe.local.response['http_status_code'] = 400
 		return {"status": "error", "message": "Invalid JSON"}
 		
+	# Debug: Log the full payload structure to understand format
+	frappe.log_error(f"Full webhook payload: {json.dumps(data, indent=2)}", "LemonSqueezy Webhook Debug")
+	
 	event_name = data.get("meta", {}).get("event_name")
 	
 	# Validate event is supported
 	if event_name not in SUPPORTED_EVENTS:
-		frappe.log_error(f"Unsupported event type: {event_name}", "LemonSqueezy Webhook")
+		frappe.log_error(f"Unsupported event type: {event_name}\nPayload keys: {list(data.keys())}\nMeta: {data.get('meta', {})}", "LemonSqueezy Webhook")
 		return {"status": "success", "message": "Event not supported"}
 	
 	# Create Webhook Log

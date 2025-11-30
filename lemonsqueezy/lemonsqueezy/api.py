@@ -359,105 +359,105 @@ def process_subscription_event(data, settings, event_name):
 
 @frappe.whitelist(allow_guest=True)
 def lemonsqueezy_checkout(**kwargs):
-        """
-        Redirect to LemonSqueezy Checkout
-        Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
-        """
-        try:
-                # Get settings
-                # Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
-                settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
-                if not settings_name:
-                        frappe.throw(_("No enabled LemonSqueezy Settings found"))
+	"""
+	Redirect to LemonSqueezy Checkout
+	Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
+	"""
+	try:
+		# Get settings
+		# Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
+		settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
+		if not settings_name:
+			frappe.throw(_("No enabled LemonSqueezy Settings found"))
 
-                settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
 
-                if not kwargs.get("variant_id") and not settings.default_variant_id and not (
-                        kwargs.get("reference_doctype") and kwargs.get("reference_docname")
-                ):
-                        frappe.throw(_("A valid reference or variant_id is required to start checkout."))
-        
-        # Try to find Variant ID from Reference Document (Subscription Plan)
-        if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):
-            try:
-                ref_dt = kwargs.get("reference_doctype")
-                ref_dn = kwargs.get("reference_docname")
-                
-                                # If reference is Payment Request, get the actual reference (Subscription/Invoice)
-                                if ref_dt == "Payment Request":
-                                        pr_name = kwargs.get("reference_docname")
-                                        if not frappe.db.exists("Payment Request", pr_name):
-                                                frappe.throw(_("Payment Request {0} was not found.").format(pr_name))
+		if not kwargs.get("variant_id") and not settings.default_variant_id and not (
+			kwargs.get("reference_doctype") and kwargs.get("reference_docname")
+		):
+			frappe.throw(_("A valid reference or variant_id is required to start checkout."))
+	
+		# Try to find Variant ID from Reference Document (Subscription Plan)
+		if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):
+			try:
+				ref_dt = kwargs.get("reference_doctype")
+				ref_dn = kwargs.get("reference_docname")
+				
+				# If reference is Payment Request, get the actual reference (Subscription/Invoice)
+				if ref_dt == "Payment Request":
+					pr_name = kwargs.get("reference_docname")
+					if not frappe.db.exists("Payment Request", pr_name):
+						frappe.throw(_("Payment Request {0} was not found.").format(pr_name))
 
-                                        pr = frappe.db.get_value(
-                                                "Payment Request",
-                                                pr_name,
-                                                ["reference_doctype", "reference_name", "status"],
-                                                as_dict=1,
-                                        )
+					pr = frappe.db.get_value(
+						"Payment Request",
+						pr_name,
+						["reference_doctype", "reference_name", "status"],
+						as_dict=1,
+					)
 
-                                        if pr:
-                                                if pr.status in ("Paid", "Cancelled"):
-                                                        frappe.throw(_("Payment Request {0} is not payable.").format(pr_name))
+					if pr:
+						if pr.status in ("Paid", "Cancelled"):
+							frappe.throw(_("Payment Request {0} is not payable.").format(pr_name))
 
-                                                ref_dt = pr.reference_doctype
-                                                ref_dn = pr.reference_name
+						ref_dt = pr.reference_doctype
+						ref_dn = pr.reference_name
 
-                # Handle Sales Invoice reference
-                if ref_dt == "Sales Invoice":
-                    # PRIORITY 1: Check if the Item has a specific LemonSqueezy Variant ID
-                    items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["item_code"], limit=1)
-                    if items:
-                        item_code = items[0].item_code
-                        # Check if this Item has a specific LemonSqueezy Variant ID
-                        item_variant_id = frappe.db.get_value("Item", item_code, "lemonsqueezy_variant_id")
-                        if item_variant_id:
-                            kwargs["variant_id"] = item_variant_id
-                            frappe.log_error(f"Found Variant ID {item_variant_id} from Item {item_code}", "LemonSqueezy Debug")
-                        else:
-                            # PRIORITY 2: No specific variant, check if it's a subscription-based invoice
-                            sub_name = frappe.db.get_value("Sales Invoice", ref_dn, "subscription")
-                            if sub_name:
-                                ref_dt = "Subscription"
-                                ref_dn = sub_name
-                            else:
-                                # PRIORITY 3: Check items for subscription plan
-                                sub_items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["subscription_plan"])
-                                if sub_items and sub_items[0].subscription_plan:
-                                    plan_id = sub_items[0].subscription_plan
-                                    variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
-                                    if variant_id:
-                                        kwargs["variant_id"] = variant_id
-                                        frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
+				# Handle Sales Invoice reference
+				if ref_dt == "Sales Invoice":
+					# PRIORITY 1: Check if the Item has a specific LemonSqueezy Variant ID
+					items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["item_code"], limit=1)
+					if items:
+						item_code = items[0].item_code
+						# Check if this Item has a specific LemonSqueezy Variant ID
+						item_variant_id = frappe.db.get_value("Item", item_code, "lemonsqueezy_variant_id")
+						if item_variant_id:
+							kwargs["variant_id"] = item_variant_id
+							frappe.log_error(f"Found Variant ID {item_variant_id} from Item {item_code}", "LemonSqueezy Debug")
+						else:
+							# PRIORITY 2: No specific variant, check if it's a subscription-based invoice
+							sub_name = frappe.db.get_value("Sales Invoice", ref_dn, "subscription")
+							if sub_name:
+								ref_dt = "Subscription"
+								ref_dn = sub_name
+							else:
+								# PRIORITY 3: Check items for subscription plan
+								sub_items = frappe.get_all("Sales Invoice Item", filters={"parent": ref_dn}, fields=["subscription_plan"])
+								if sub_items and sub_items[0].subscription_plan:
+									plan_id = sub_items[0].subscription_plan
+									variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+									if variant_id:
+										kwargs["variant_id"] = variant_id
+										frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
 
-                # Handle Subscription reference
-                if ref_dt == "Subscription":
-                    # Get plan from Subscription
-                    # 'plans' is a child table in Subscription
-                    plans = frappe.get_all("Subscription Plan Detail", filters={"parent": ref_dn}, fields=["plan"])
-                    if plans:
-                        # Use the first plan found
-                        plan_id = plans[0].plan
-                        # Get product_price_id from Subscription Plan
-                        variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
-                        if variant_id:
-                            kwargs["variant_id"] = variant_id
-                            frappe.log_error(f"Found Variant ID {variant_id} from Subscription Plan {plan_id}", "LemonSqueezy Debug")
-            except Exception as e:
-                frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
+				# Handle Subscription reference
+				if ref_dt == "Subscription":
+					# Get plan from Subscription
+					# 'plans' is a child table in Subscription
+					plans = frappe.get_all("Subscription Plan Detail", filters={"parent": ref_dn}, fields=["plan"])
+					if plans:
+						# Use the first plan found
+						plan_id = plans[0].plan
+						# Get product_price_id from Subscription Plan
+						variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+						if variant_id:
+							kwargs["variant_id"] = variant_id
+							frappe.log_error(f"Found Variant ID {variant_id} from Subscription Plan {plan_id}", "LemonSqueezy Debug")
+			except Exception as e:
+				frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
 
-        # Generate the checkout URL
-        # kwargs contains arguments passed from Payment Request
-        checkout_url = settings.get_api_checkout_url(**kwargs)
-        
-        if checkout_url:
-            frappe.local.response["type"] = "redirect"
-            frappe.local.response["location"] = checkout_url
-        else:
-            frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
-            
-    except Exception as e:
-        error_msg = str(e)
-        # Use explicit title and message to avoid length issues
-        frappe.log_error(message=f"LemonSqueezy Checkout Error: {error_msg[:500]}", title="LemonSqueezy Checkout Error")
-        frappe.throw(_("Error initiating checkout. Please check Error Log for details."))
+		# Generate the checkout URL
+		# kwargs contains arguments passed from Payment Request
+		checkout_url = settings.get_api_checkout_url(**kwargs)
+		
+		if checkout_url:
+			frappe.local.response["type"] = "redirect"
+			frappe.local.response["location"] = checkout_url
+		else:
+			frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
+			
+	except Exception as e:
+		error_msg = str(e)
+		# Use explicit title and message to avoid length issues
+		frappe.log_error(message=f"LemonSqueezy Checkout Error: {error_msg[:500]}", title="LemonSqueezy Checkout Error")
+		frappe.throw(_("Error initiating checkout. Please check Error Log for details."))

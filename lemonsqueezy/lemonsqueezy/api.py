@@ -90,28 +90,28 @@ def handle_webhook():
         frappe.log_error(f"Invalid JSON in webhook: {str(e)}", "LemonSqueezy Webhook Error")
         frappe.local.response['http_status_code'] = 400
         return {"status": "error", "message": "Invalid JSON"}
-        
-        # Log minimal context without storing full payload to avoid leaking sensitive data
-        meta = data.get("meta") or {}
-        frappe.log_error(
-                f"Received webhook event: {meta.get('event_name')} for store {meta.get('store_id')}",
-                "LemonSqueezy Webhook Debug",
-        )
 
-        event_name = data.get("meta", {}).get("event_name")
-    
-        if not event_name:
-                frappe.log_error("Missing event_name in LemonSqueezy webhook metadata", "LemonSqueezy Webhook Error")
-                frappe.local.response['http_status_code'] = 400
-                return {"status": "error", "message": "Invalid event"}
+    # Log minimal context without storing full payload to avoid leaking sensitive data
+    meta = data.get("meta") or {}
+    frappe.log_error(
+            f"Received webhook event: {meta.get('event_name')} for store {meta.get('store_id')}",
+            "LemonSqueezy Webhook Debug",
+    )
 
-        # Validate event is supported
-        if event_name not in SUPPORTED_EVENTS:
-                frappe.log_error(
-                        f"Unsupported event type: {event_name}",
-                        "LemonSqueezy Webhook",
-                )
-                return {"status": "success", "message": "Event not supported"}
+    event_name = data.get("meta", {}).get("event_name")
+
+    if not event_name:
+            frappe.log_error("Missing event_name in LemonSqueezy webhook metadata", "LemonSqueezy Webhook Error")
+            frappe.local.response['http_status_code'] = 400
+            return {"status": "error", "message": "Invalid event"}
+
+    # Validate event is supported
+    if event_name not in SUPPORTED_EVENTS:
+            frappe.log_error(
+                    f"Unsupported event type: {event_name}",
+                    "LemonSqueezy Webhook",
+            )
+            return {"status": "success", "message": "Event not supported"}
     
     # Create Webhook Log
     log_doc = frappe.get_doc({
@@ -147,9 +147,15 @@ def handle_webhook():
 
 def process_order_created(data, settings):
     """Process order_created webhook event"""
+    order_data = data.get("data", {})
+    attributes = order_data.get("attributes", {})
+
+    paid_amount = (attributes.get("total") or 0) / 100
+    paid_currency = (attributes.get("currency") or "USD").upper()
+
     custom_data = data.get("meta", {}).get("custom_data", {})
     payment_request_id = custom_data.get("payment_request_id")
-    
+
     # Update Payment Request if exists
     if payment_request_id:
         try:
@@ -157,19 +163,42 @@ def process_order_created(data, settings):
                 frappe.log_error(f"Payment Request {payment_request_id} not found")
             else:
                 pr = frappe.get_doc("Payment Request", payment_request_id)
-                if pr.status != "Paid":
+                should_mark_paid = True
+                expected_amount = (
+                    pr.get("payment_amount")
+                    or pr.get("grand_total")
+                    or pr.get("total_amount_to_pay")
+                )
+                expected_currency = (pr.get("currency") or "").upper()
+
+                if expected_amount:
+                    expected_amount = float(expected_amount)
+                    if paid_amount + 0.009 < expected_amount:
+                        frappe.log_error(
+                            f"Partial payment received for Payment Request {payment_request_id}: "
+                            f"expected {expected_amount} but received {paid_amount} {paid_currency}",
+                            "LemonSqueezy Webhook",
+                        )
+                        should_mark_paid = False
+
+                if expected_currency and expected_currency != paid_currency:
+                    frappe.log_error(
+                        f"Currency mismatch for Payment Request {payment_request_id}: "
+                        f"expected {expected_currency} but received {paid_currency}",
+                        "LemonSqueezy Webhook",
+                    )
+                    should_mark_paid = False
+
+                if should_mark_paid and pr.status != "Paid":
                     pr.status = "Paid"
                     pr.db_set("status", "Paid")
                     pr.run_method("on_payment_authorized", "Completed")
                     frappe.db.commit()
         except Exception as e:
             frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
-    
+
     # Store order data in LemonSqueezy Order
     try:
-        order_data = data.get("data", {})
-        attributes = order_data.get("attributes", {})
-        
         order_id = str(order_data.get("id"))
         
         # Check if order already exists
@@ -359,35 +388,38 @@ def process_subscription_event(data, settings, event_name):
 
 @frappe.whitelist(allow_guest=True)
 def lemonsqueezy_checkout(**kwargs):
-	"""
-	Redirect to LemonSqueezy Checkout
-	Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
-	"""
-	try:
-		# Get settings
-		# Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
-		settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
-		if not settings_name:
-			frappe.throw(_("No enabled LemonSqueezy Settings found"))
+        """
+        Redirect to LemonSqueezy Checkout
+        Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
+        """
+        try:
+                # Get settings
+                # Since LemonSqueezy Settings is not a Single DocType, we need to find the enabled one
+                settings_name = frappe.db.get_value("LemonSqueezy Settings", {"enabled": 1}, "name")
+                if not settings_name:
+                        frappe.throw(_("No enabled LemonSqueezy Settings found"))
 
-		settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
+                settings = frappe.get_doc("LemonSqueezy Settings", settings_name)
 
-		if not kwargs.get("variant_id") and not settings.default_variant_id and not (
-			kwargs.get("reference_doctype") and kwargs.get("reference_docname")
-		):
-			frappe.throw(_("A valid reference or variant_id is required to start checkout."))
+                payment_request_id = None
+
+                if not kwargs.get("variant_id") and not settings.default_variant_id and not (
+                        kwargs.get("reference_doctype") and kwargs.get("reference_docname")
+                ):
+                        frappe.throw(_("A valid reference or variant_id is required to start checkout."))
 	
 		# Try to find Variant ID from Reference Document (Subscription Plan)
 		if not kwargs.get("variant_id") and kwargs.get("reference_doctype") and kwargs.get("reference_docname"):
 			try:
-				ref_dt = kwargs.get("reference_doctype")
-				ref_dn = kwargs.get("reference_docname")
-				
-				# If reference is Payment Request, get the actual reference (Subscription/Invoice)
-				if ref_dt == "Payment Request":
-					pr_name = kwargs.get("reference_docname")
-					if not frappe.db.exists("Payment Request", pr_name):
-						frappe.throw(_("Payment Request {0} was not found.").format(pr_name))
+                                ref_dt = kwargs.get("reference_doctype")
+                                ref_dn = kwargs.get("reference_docname")
+
+                                # If reference is Payment Request, get the actual reference (Subscription/Invoice)
+                                if ref_dt == "Payment Request":
+                                        payment_request_id = ref_dn
+                                        pr_name = kwargs.get("reference_docname")
+                                        if not frappe.db.exists("Payment Request", pr_name):
+                                                frappe.throw(_("Payment Request {0} was not found.").format(pr_name))
 
 					pr = frappe.db.get_value(
 						"Payment Request",
@@ -400,8 +432,8 @@ def lemonsqueezy_checkout(**kwargs):
 						if pr.status in ("Paid", "Cancelled"):
 							frappe.throw(_("Payment Request {0} is not payable.").format(pr_name))
 
-						ref_dt = pr.reference_doctype
-						ref_dn = pr.reference_name
+                                                ref_dt = pr.reference_doctype
+                                                ref_dn = pr.reference_name
 
 				# Handle Sales Invoice reference
 				if ref_dt == "Sales Invoice":
@@ -430,25 +462,28 @@ def lemonsqueezy_checkout(**kwargs):
 										kwargs["variant_id"] = variant_id
 										frappe.log_error(f"Found Variant ID {variant_id} from Invoice Item Plan {plan_id}", "LemonSqueezy Debug")
 
-				# Handle Subscription reference
-				if ref_dt == "Subscription":
-					# Get plan from Subscription
-					# 'plans' is a child table in Subscription
-					plans = frappe.get_all("Subscription Plan Detail", filters={"parent": ref_dn}, fields=["plan"])
-					if plans:
-						# Use the first plan found
-						plan_id = plans[0].plan
-						# Get product_price_id from Subscription Plan
-						variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
-						if variant_id:
-							kwargs["variant_id"] = variant_id
-							frappe.log_error(f"Found Variant ID {variant_id} from Subscription Plan {plan_id}", "LemonSqueezy Debug")
-			except Exception as e:
-				frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
+                                # Handle Subscription reference
+                                if ref_dt == "Subscription":
+                                        # Get plan from Subscription
+                                        # 'plans' is a child table in Subscription
+                                        plans = frappe.get_all("Subscription Plan Detail", filters={"parent": ref_dn}, fields=["plan"])
+                                        if plans:
+                                                # Use the first plan found
+                                                plan_id = plans[0].plan
+                                                # Get product_price_id from Subscription Plan
+                                                variant_id = frappe.db.get_value("Subscription Plan", plan_id, "product_price_id")
+                                                if variant_id:
+                                                        kwargs["variant_id"] = variant_id
+                                                        frappe.log_error(f"Found Variant ID {variant_id} from Subscription Plan {plan_id}", "LemonSqueezy Debug")
+                        except Exception as e:
+                                frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
 
-		# Generate the checkout URL
-		# kwargs contains arguments passed from Payment Request
-		checkout_url = settings.get_api_checkout_url(**kwargs)
+                if payment_request_id:
+                        kwargs["payment_request_id"] = payment_request_id
+
+                # Generate the checkout URL
+                # kwargs contains arguments passed from Payment Request
+                checkout_url = settings.get_api_checkout_url(**kwargs)
 		
 		if checkout_url:
 			frappe.local.response["type"] = "redirect"

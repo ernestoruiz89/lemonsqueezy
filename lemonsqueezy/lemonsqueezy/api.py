@@ -3,7 +3,8 @@ import hmac
 import hashlib
 import json
 from frappe import _
-from frappe.utils import get_datetime, nowdate
+from frappe.utils import get_datetime, nowdate, flt
+from erpnext.setup.utils import get_exchange_rate
 
 # Supported webhook events
 SUPPORTED_EVENTS = [
@@ -195,7 +196,6 @@ def process_order_created(data, settings):
                 frappe.log_error(f"LemonSqueezy Order Status: {order_status} for Order {order_id}", "LemonSqueezy Debug")
                 
                 # Only mark as paid if LemonSqueezy confirms payment is complete
-                # LemonSqueezy order statuses: 'paid', 'pending', 'failed', 'refunded'
                 if order_status != "paid":
                     frappe.log_error(
                         f"Order {order_id} status is '{order_status}', not 'paid'. Payment Request will not be marked as paid.",
@@ -231,8 +231,21 @@ def process_order_created(data, settings):
                         payment_entry.posting_date = get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate()
                         payment_entry.party_type = "Customer"
                         payment_entry.party = pr.party
-                        payment_entry.paid_amount = pr.grand_total
-                        payment_entry.received_amount = pr.grand_total
+                        
+                        # Handle Currency Conversion
+                        source_amount = flt(pr.grand_total)
+                        source_currency = pr.currency
+                        target_currency = frappe.get_value("Account", payment_account, "account_currency") or frappe.get_cached_value('Company',  company,  "default_currency")
+                        
+                        exchange_rate = 1.0
+                        paid_amount = source_amount
+                        
+                        if source_currency != target_currency:
+                            exchange_rate = get_exchange_rate(source_currency, target_currency, payment_entry.posting_date)
+                            paid_amount = flt(source_amount) * flt(exchange_rate)
+                            
+                        payment_entry.paid_amount = paid_amount
+                        payment_entry.received_amount = paid_amount
                         payment_entry.paid_from = customer_account
                         payment_entry.paid_to = payment_account
                         payment_entry.reference_no = order_id
@@ -242,15 +255,33 @@ def process_order_created(data, settings):
                         if frappe.db.exists("Mode of Payment", "LemonSqueezy"):
                             payment_entry.mode_of_payment = "LemonSqueezy"
                         
+                        # Calculate outstanding amount to prevent over-allocation
+                        outstanding_amount = 0
+                        if pr.reference_doctype == "Sales Order":
+                            so = frappe.get_doc("Sales Order", pr.reference_name)
+                            outstanding_amount = flt(so.grand_total) - flt(so.advance_paid)
+                            if source_currency != target_currency:
+                                outstanding_amount = outstanding_amount * exchange_rate
+                                
+                        elif pr.reference_doctype == "Sales Invoice":
+                            si = frappe.get_doc("Sales Invoice", pr.reference_name)
+                            outstanding_amount = flt(si.outstanding_amount)
+                            if source_currency != target_currency:
+                                outstanding_amount = outstanding_amount * exchange_rate
+
+                        # Allocate amount (capped at outstanding to avoid error)
+                        allocated_amount = min(paid_amount, outstanding_amount) if outstanding_amount > 0 else paid_amount
+                        
                         # Add reference to the source document (Sales Order/Invoice)
                         payment_entry.append("references", {
                             "reference_doctype": pr.reference_doctype,
                             "reference_name": pr.reference_name,
-                            "allocated_amount": pr.grand_total
+                            "allocated_amount": allocated_amount,
+                            "exchange_rate": exchange_rate if source_currency != target_currency else 1.0
                         })
                         
                         # Add remarks
-                        payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}"
+                        payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}. Amount: {source_amount} {source_currency} -> {paid_amount} {target_currency}"
                         
                         # Insert and submit payment entry
                         payment_entry.insert(ignore_permissions=True)

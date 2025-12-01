@@ -154,6 +154,15 @@ class LemonSqueezySettings(Document):
             }
         }
 
+        # Prepare checkout metadata and buyer details
+        checkout_data = {}
+
+        if kwargs.get("payer_email"):
+            checkout_data["email"] = kwargs.get("payer_email")
+
+        if kwargs.get("payer_name"):
+            checkout_data["name"] = kwargs.get("payer_name")
+
         # Attach custom metadata so the webhook can correlate payments to ERPNext documents
         custom_data = {
             key: kwargs[key]
@@ -162,7 +171,10 @@ class LemonSqueezySettings(Document):
         }
 
         if custom_data:
-            payload["data"]["attributes"]["custom"] = custom_data
+            checkout_data["custom"] = custom_data
+
+        if checkout_data:
+            payload["data"]["attributes"]["checkout_data"] = checkout_data
 
         # Handle custom price if amount is provided
         amount = kwargs.get("amount")

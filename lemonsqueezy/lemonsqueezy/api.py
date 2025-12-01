@@ -206,6 +206,10 @@ def process_order_created(data, settings):
                 if should_mark_paid and pr.status != "Paid":
                     # Create Payment Entry manually
                     try:
+                        # Switch to Administrator to bypass permission checks
+                        current_user = frappe.session.user
+                        frappe.set_user("Administrator")
+                        
                         # Get company and accounts from Payment Request
                         company = pr.company
                         payment_account = pr.payment_account
@@ -248,10 +252,6 @@ def process_order_created(data, settings):
                         # Add remarks
                         payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}"
                         
-                        # Set flags to bypass permission checks (webhook runs as guest)
-                        payment_entry.flags.ignore_permissions = True
-                        payment_entry.flags.ignore_mandatory = True
-                        
                         # Insert and submit payment entry
                         payment_entry.insert(ignore_permissions=True)
                         payment_entry.submit()
@@ -271,6 +271,9 @@ def process_order_created(data, settings):
                         )
                         # Do NOT mark PR as paid if Payment Entry creation fails
                         # Leave it in its current state so it can be retried
+                    finally:
+                        # Restore original user
+                        frappe.set_user(current_user)
         except Exception as e:
             frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
 

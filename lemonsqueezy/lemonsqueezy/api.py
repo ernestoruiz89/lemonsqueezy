@@ -4,7 +4,6 @@ import hashlib
 import json
 from frappe import _
 from frappe.utils import get_datetime, nowdate
-from erpnext.accounts.doctype.payment_request.payment_request import make_payment_entry
 
 # Supported webhook events
 SUPPORTED_EVENTS = [
@@ -205,23 +204,48 @@ def process_order_created(data, settings):
                     should_mark_paid = False
 
                 if should_mark_paid and pr.status != "Paid":
-                    # Create Payment Entry
+                    # Create Payment Entry manually
                     try:
-                        payment_entry = make_payment_entry(
-                            dt=pr.reference_doctype,
-                            dn=pr.reference_name,
-                            bank_account=pr.payment_account
+                        # Get company and accounts from Payment Request
+                        company = pr.company
+                        payment_account = pr.payment_account
+                        
+                        # Get customer account (receivable account)
+                        customer_account = frappe.get_value("Party Account", 
+                            {"parent": pr.party, "parenttype": "Customer", "company": company}, 
+                            "account"
                         )
                         
-                        # Set additional payment details
-                        payment_entry.reference_no = order_id
-                        payment_entry.reference_date = get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate()
+                        if not customer_account:
+                            # Fallback to default receivable account
+                            customer_account = frappe.get_value("Company", company, "default_receivable_account")
                         
-                        # Set mode of payment to LemonSqueezy if it exists, otherwise use default
+                        # Create Payment Entry document
+                        payment_entry = frappe.new_doc("Payment Entry")
+                        payment_entry.payment_type = "Receive"
+                        payment_entry.company = company
+                        payment_entry.posting_date = get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate()
+                        payment_entry.party_type = "Customer"
+                        payment_entry.party = pr.party
+                        payment_entry.paid_amount = pr.grand_total
+                        payment_entry.received_amount = pr.grand_total
+                        payment_entry.paid_from = customer_account
+                        payment_entry.paid_to = payment_account
+                        payment_entry.reference_no = order_id
+                        payment_entry.reference_date = payment_entry.posting_date
+                        
+                        # Set mode of payment
                         if frappe.db.exists("Mode of Payment", "LemonSqueezy"):
                             payment_entry.mode_of_payment = "LemonSqueezy"
                         
-                        # Add reference to Payment Request in remarks
+                        # Add reference to the source document (Sales Order/Invoice)
+                        payment_entry.append("references", {
+                            "reference_doctype": pr.reference_doctype,
+                            "reference_name": pr.reference_name,
+                            "allocated_amount": pr.grand_total
+                        })
+                        
+                        # Add remarks
                         payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}"
                         
                         # Insert and submit payment entry

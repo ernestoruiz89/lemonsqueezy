@@ -232,12 +232,6 @@ def process_order_created(data, settings):
                     frappe.db.commit()
         except Exception as e:
             frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
-                    pr.status = "Paid"
-                    pr.db_set("status", "Paid")
-                    pr.run_method("on_payment_authorized", "Completed")
-                    frappe.db.commit()
-        except Exception as e:
-            frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
 
     # Store order data in LemonSqueezy Order
     try:

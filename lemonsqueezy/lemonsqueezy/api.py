@@ -248,6 +248,10 @@ def process_order_created(data, settings):
                         # Add remarks
                         payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}"
                         
+                        # Set flags to bypass permission checks (webhook runs as guest)
+                        payment_entry.flags.ignore_permissions = True
+                        payment_entry.flags.ignore_mandatory = True
+                        
                         # Insert and submit payment entry
                         payment_entry.insert(ignore_permissions=True)
                         payment_entry.submit()

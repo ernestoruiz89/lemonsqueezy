@@ -191,7 +191,103 @@ def process_order_created(data, settings):
                     )
                     should_mark_paid = False
 
-            frappe.log_error(f"Order {order_id} already exists")
+                # Verify payment status from LemonSqueezy order
+                order_status = attributes.get("status")
+                frappe.log_error(f"LemonSqueezy Order Status: {order_status} for Order {order_id}", "LemonSqueezy Debug")
+                
+                # Only mark as paid if LemonSqueezy confirms payment is complete
+                if order_status != "paid":
+                    frappe.log_error(
+                        f"Order {order_id} status is '{order_status}', not 'paid'. Payment Request will not be marked as paid.",
+                        "LemonSqueezy Webhook"
+                    )
+                    should_mark_paid = False
+
+                if should_mark_paid and pr.status != "Paid":
+                    # Create Payment Entry manually
+                    try:
+                        # Switch to Administrator to bypass permission checks
+                        current_user = frappe.session.user
+                        frappe.set_user("Administrator")
+                        
+                        from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+                        
+                        # Get company and accounts from Payment Request
+                        company = pr.company
+                        payment_account = pr.payment_account
+                        
+                        # Handle Currency Conversion for Paid Amount
+                        source_amount = flt(pr.grand_total)
+                        source_currency = pr.currency
+                        target_currency = frappe.get_value("Account", payment_account, "account_currency") or frappe.get_cached_value('Company',  company,  "default_currency")
+                        
+                        paid_amount = source_amount
+                        if source_currency != target_currency:
+                            exchange_rate = get_exchange_rate(source_currency, target_currency, get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate())
+                            paid_amount = flt(source_amount) * flt(exchange_rate)
+                        
+                        # Create Payment Entry using ERPNext utility
+                        # This automatically handles outstanding amount, currency, and references
+                        payment_entry = get_payment_entry(
+                            dt=pr.reference_doctype,
+                            dn=pr.reference_name,
+                            bank_account=payment_account,
+                            bank_amount=paid_amount
+                        )
+                        
+                        # Update details
+                        payment_entry.payment_type = "Receive"
+                        payment_entry.mode_of_payment = "LemonSqueezy" if frappe.db.exists("Mode of Payment", "LemonSqueezy") else payment_entry.mode_of_payment
+                        payment_entry.reference_no = order_id
+                        payment_entry.reference_date = get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate()
+                        payment_entry.posting_date = payment_entry.reference_date
+                        
+                        # Ensure amounts are correct (get_payment_entry might default to outstanding)
+                        payment_entry.paid_amount = flt(paid_amount)
+                        payment_entry.received_amount = flt(paid_amount)
+                        
+                        # Adjust allocation if necessary
+                        # get_payment_entry sets allocated_amount = outstanding_amount
+                        # We need to ensure allocated_amount <= paid_amount
+                        if payment_entry.references:
+                            for ref in payment_entry.references:
+                                if ref.allocated_amount > payment_entry.paid_amount:
+                                    ref.allocated_amount = payment_entry.paid_amount
+                        
+                        # Add remarks
+                        payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}. Amount: {source_amount} {source_currency} -> {paid_amount} {target_currency}"
+                        
+                        # Insert and submit payment entry
+                        payment_entry.insert(ignore_permissions=True)
+                        payment_entry.submit()
+                        
+                        frappe.log_error(f"Payment Entry {payment_entry.name} created for Order {order_id}", "LemonSqueezy Payment Success")
+                        
+                        # Only update Payment Request status if Payment Entry was created successfully
+                        pr.status = "Paid"
+                        pr.db_set("status", "Paid")
+                        pr.run_method("on_payment_authorized", "Completed")
+                        frappe.db.commit()
+                        
+                    except Exception as pe_error:
+                        frappe.log_error(
+                            f"Error creating Payment Entry for PR {payment_request_id}: {str(pe_error)}\n{frappe.get_traceback()}",
+                            "LemonSqueezy Payment Entry Error"
+                        )
+                        # Do NOT mark PR as paid if Payment Entry creation fails
+                        # Leave it in its current state so it can be retried
+                    finally:
+                        # Restore original user
+                        frappe.set_user(current_user)
+        except Exception as e:
+            frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
+
+    # Store order data in LemonSqueezy Order
+    try:
+        order_id = str(order_data.get("id"))
+        
+        # Check if order already exists
+        if frappe.db.exists("LemonSqueezy Order", {"order_id": order_id}):
             return
         
         # Create new order

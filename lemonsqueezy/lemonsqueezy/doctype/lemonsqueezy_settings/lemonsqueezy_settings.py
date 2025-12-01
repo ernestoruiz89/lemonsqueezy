@@ -153,7 +153,17 @@ class LemonSqueezySettings(Document):
 				}
 			}
 		}
-		
+
+		# Attach custom metadata so the webhook can correlate payments to ERPNext documents
+		custom_data = {
+			key: kwargs[key]
+			for key in ("payment_request_id", "reference_doctype", "reference_docname")
+			if kwargs.get(key)
+		}
+
+		if custom_data:
+			payload["data"]["attributes"]["custom"] = custom_data
+
 		# Handle custom price if amount is provided
 		amount = kwargs.get("amount")
 		if amount:
@@ -235,4 +245,3 @@ def test_connection(name):
 		return {"success": True, "message": _("Connection successful!")}
 	except Exception as e:
 		return {"success": False, "message": str(e)}
-

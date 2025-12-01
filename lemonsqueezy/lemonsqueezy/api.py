@@ -3,7 +3,8 @@ import hmac
 import hashlib
 import json
 from frappe import _
-from frappe.utils import get_datetime
+from frappe.utils import get_datetime, nowdate
+from erpnext.accounts.doctype.payment_request.payment_request import make_payment_entry
 
 # Supported webhook events
 SUPPORTED_EVENTS = [
@@ -152,6 +153,7 @@ def process_order_created(data, settings):
 
     paid_amount = (attributes.get("total") or 0) / 100
     paid_currency = (attributes.get("currency") or "USD").upper()
+    order_id = str(order_data.get("id"))
 
     custom_data = data.get("meta", {}).get("custom_data", {})
     payment_request_id = custom_data.get("payment_request_id")
@@ -190,6 +192,46 @@ def process_order_created(data, settings):
                     should_mark_paid = False
 
                 if should_mark_paid and pr.status != "Paid":
+                    # Create Payment Entry
+                    try:
+                        payment_entry = make_payment_entry(
+                            dt=pr.reference_doctype,
+                            dn=pr.reference_name,
+                            bank_account=pr.payment_account
+                        )
+                        
+                        # Set additional payment details
+                        payment_entry.reference_no = order_id
+                        payment_entry.reference_date = get_datetime(attributes.get("created_at")).date() if attributes.get("created_at") else nowdate()
+                        
+                        # Set mode of payment to LemonSqueezy if it exists, otherwise use default
+                        if frappe.db.exists("Mode of Payment", "LemonSqueezy"):
+                            payment_entry.mode_of_payment = "LemonSqueezy"
+                        
+                        # Add reference to Payment Request in remarks
+                        payment_entry.remarks = f"Payment received via LemonSqueezy for {pr.reference_doctype} {pr.reference_name}. Order ID: {order_id}"
+                        
+                        # Insert and submit payment entry
+                        payment_entry.insert(ignore_permissions=True)
+                        payment_entry.submit()
+                        
+                        frappe.log_error(f"Payment Entry {payment_entry.name} created for Order {order_id}", "LemonSqueezy Payment Success")
+                        
+                    except Exception as pe_error:
+                        frappe.log_error(
+                            f"Error creating Payment Entry for PR {payment_request_id}: {str(pe_error)}\n{frappe.get_traceback()}",
+                            "LemonSqueezy Payment Entry Error"
+                        )
+                        # Still mark PR as paid even if Payment Entry creation fails
+                        # This prevents the order from being stuck
+                    
+                    # Update Payment Request status
+                    pr.status = "Paid"
+                    pr.db_set("status", "Paid")
+                    pr.run_method("on_payment_authorized", "Completed")
+                    frappe.db.commit()
+        except Exception as e:
+            frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
                     pr.status = "Paid"
                     pr.db_set("status", "Paid")
                     pr.run_method("on_payment_authorized", "Completed")

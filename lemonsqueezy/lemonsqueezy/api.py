@@ -258,19 +258,19 @@ def process_order_created(data, settings):
                         
                         frappe.log_error(f"Payment Entry {payment_entry.name} created for Order {order_id}", "LemonSqueezy Payment Success")
                         
+                        # Only update Payment Request status if Payment Entry was created successfully
+                        pr.status = "Paid"
+                        pr.db_set("status", "Paid")
+                        pr.run_method("on_payment_authorized", "Completed")
+                        frappe.db.commit()
+                        
                     except Exception as pe_error:
                         frappe.log_error(
                             f"Error creating Payment Entry for PR {payment_request_id}: {str(pe_error)}\n{frappe.get_traceback()}",
                             "LemonSqueezy Payment Entry Error"
                         )
-                        # Still mark PR as paid even if Payment Entry creation fails
-                        # This prevents the order from being stuck
-                    
-                    # Update Payment Request status
-                    pr.status = "Paid"
-                    pr.db_set("status", "Paid")
-                    pr.run_method("on_payment_authorized", "Completed")
-                    frappe.db.commit()
+                        # Do NOT mark PR as paid if Payment Entry creation fails
+                        # Leave it in its current state so it can be retried
         except Exception as e:
             frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
 

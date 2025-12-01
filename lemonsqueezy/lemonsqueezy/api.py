@@ -516,6 +516,40 @@ def lemonsqueezy_checkout(**kwargs):
                         ref_dt = pr.reference_doctype
                         ref_dn = pr.reference_name
 
+                # Check if Sales Order or Sales Invoice is already fully paid
+                if ref_dt in ["Sales Order", "Sales Invoice"]:
+                    try:
+                        doc = frappe.get_doc(ref_dt, ref_dn)
+                        
+                        # For Sales Order, check if outstanding_amount is 0 or status indicates payment
+                        if ref_dt == "Sales Order":
+                            if doc.advance_paid >= doc.grand_total or doc.status in ["Completed", "Closed"]:
+                                frappe.local.response["type"] = "redirect"
+                                frappe.local.response["location"] = frappe.utils.get_url(
+                                    "/payment-success?doctype={}&docname={}&redirect_message={}".format(
+                                        ref_dt, 
+                                        ref_dn,
+                                        frappe.utils.quote("This order has already been paid.")
+                                    )
+                                )
+                                return
+                        
+                        # For Sales Invoice, check outstanding_amount
+                        elif ref_dt == "Sales Invoice":
+                            if doc.outstanding_amount <= 0 or doc.status == "Paid":
+                                frappe.local.response["type"] = "redirect"
+                                frappe.local.response["location"] = frappe.utils.get_url(
+                                    "/payment-success?doctype={}&docname={}&redirect_message={}".format(
+                                        ref_dt,
+                                        ref_dn,
+                                        frappe.utils.quote("This invoice has already been paid.")
+                                    )
+                                )
+                                return
+                    except Exception as e:
+                        # Log error but continue with payment flow
+                        frappe.log_error(f"Error checking payment status: {str(e)}", "LemonSqueezy")
+
                 # Handle Sales Invoice reference
                 if ref_dt == "Sales Invoice":
                     # PRIORITY 1: Check if the Item has a specific LemonSqueezy Variant ID

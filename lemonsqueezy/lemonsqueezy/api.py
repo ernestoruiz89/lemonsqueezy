@@ -518,6 +518,9 @@ def lemonsqueezy_checkout(**kwargs):
         if payment_request_id:
             kwargs["payment_request_id"] = payment_request_id
 
+        # Log the kwargs being passed to checkout
+        frappe.log_error(f"Checkout kwargs before calling get_api_checkout_url: {json.dumps(kwargs, indent=2)}", "LemonSqueezy Debug")
+
         # Generate the checkout URL
         # kwargs contains arguments passed from Payment Request
         checkout_url = settings.get_api_checkout_url(**kwargs)

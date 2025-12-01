@@ -191,6 +191,19 @@ def process_order_created(data, settings):
                     )
                     should_mark_paid = False
 
+                # Verify payment status from LemonSqueezy order
+                order_status = attributes.get("status")
+                frappe.log_error(f"LemonSqueezy Order Status: {order_status} for Order {order_id}", "LemonSqueezy Debug")
+                
+                # Only mark as paid if LemonSqueezy confirms payment is complete
+                # LemonSqueezy order statuses: 'paid', 'pending', 'failed', 'refunded'
+                if order_status != "paid":
+                    frappe.log_error(
+                        f"Order {order_id} status is '{order_status}', not 'paid'. Payment Request will not be marked as paid.",
+                        "LemonSqueezy Webhook"
+                    )
+                    should_mark_paid = False
+
                 if should_mark_paid and pr.status != "Paid":
                     # Create Payment Entry
                     try:
@@ -515,8 +528,54 @@ def lemonsqueezy_checkout(**kwargs):
             except Exception as e:
                 frappe.log_error(f"Error fetching variant from subscription: {str(e)}", "LemonSqueezy Debug")
 
+        # Check if there's already an active Payment Request for this Sales Order/Invoice
+        if kwargs.get("reference_doctype") in ["Sales Order", "Sales Invoice"] and kwargs.get("reference_docname"):
+            try:
+                existing_pr = frappe.db.get_all(
+                    "Payment Request",
+                    filters={
+                        "reference_doctype": kwargs.get("reference_doctype"),
+                        "reference_name": kwargs.get("reference_docname"),
+                        "status": ["in", ["Initiated", "Requested"]],  # Only active/pending requests
+                        "docstatus": ["<", 2]  # Not cancelled
+                    },
+                    fields=["name", "grand_total"],
+                    order_by="creation desc",
+                    limit=1
+                )
+                
+                if existing_pr:
+                    payment_request_id = existing_pr[0].name
+                    frappe.log_error(
+                        f"Found existing Payment Request {payment_request_id} for {kwargs.get('reference_doctype')} {kwargs.get('reference_docname')}",
+                        "LemonSqueezy Debug"
+                    )
+                    # Override the reference to use the existing Payment Request
+                    kwargs["reference_doctype"] = "Payment Request"
+                    kwargs["reference_docname"] = payment_request_id
+            except Exception as e:
+                frappe.log_error(f"Error checking for existing Payment Request: {str(e)}", "LemonSqueezy Debug")
+
         if payment_request_id:
             kwargs["payment_request_id"] = payment_request_id
+            
+            # Get the amount from Payment Request if not provided or is 0
+            amount = kwargs.get("amount")
+            if not amount or float(amount) == 0:
+                try:
+                    pr = frappe.get_doc("Payment Request", payment_request_id)
+                    # Try different amount fields in order of preference
+                    amount = (
+                        pr.get("grand_total") or 
+                        pr.get("payment_amount") or 
+                        pr.get("total_amount_to_pay") or 
+                        0
+                    )
+                    if amount and float(amount) > 0:
+                        kwargs["amount"] = amount
+                        frappe.log_error(f"Extracted amount {amount} from Payment Request {payment_request_id}", "LemonSqueezy Debug")
+                except Exception as e:
+                    frappe.log_error(f"Error extracting amount from Payment Request: {str(e)}", "LemonSqueezy Error")
 
         # Log the kwargs being passed to checkout
         frappe.log_error(f"Checkout kwargs before calling get_api_checkout_url: {json.dumps(kwargs, indent=2)}", "LemonSqueezy Debug")

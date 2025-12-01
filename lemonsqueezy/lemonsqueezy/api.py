@@ -520,10 +520,12 @@ def lemonsqueezy_checkout(**kwargs):
                 if ref_dt in ["Sales Order", "Sales Invoice"]:
                     try:
                         doc = frappe.get_doc(ref_dt, ref_dn)
+                        outstanding_amount = 0
                         
-                        # For Sales Order, check if outstanding_amount is 0 or status indicates payment
+                        # For Sales Order, calculate outstanding amount
                         if ref_dt == "Sales Order":
-                            if doc.advance_paid >= doc.grand_total or doc.status in ["Completed", "Closed"]:
+                            outstanding_amount = flt(doc.grand_total) - flt(doc.advance_paid)
+                            if outstanding_amount <= 0.01 or doc.status in ["Completed", "Closed"]:
                                 frappe.local.response["type"] = "redirect"
                                 frappe.local.response["location"] = frappe.utils.get_url(
                                     "/payment-success?doctype={}&docname={}&redirect_message={}".format(
@@ -533,10 +535,16 @@ def lemonsqueezy_checkout(**kwargs):
                                     )
                                 )
                                 return
+                            
+                            # Use outstanding amount for payment
+                            if outstanding_amount > 0:
+                                kwargs["amount"] = outstanding_amount
+                                frappe.log_error(f"Using outstanding amount {outstanding_amount} for Sales Order {ref_dn}", "LemonSqueezy Debug")
                         
                         # For Sales Invoice, check outstanding_amount
                         elif ref_dt == "Sales Invoice":
-                            if doc.outstanding_amount <= 0 or doc.status == "Paid":
+                            outstanding_amount = flt(doc.outstanding_amount)
+                            if outstanding_amount <= 0 or doc.status == "Paid":
                                 frappe.local.response["type"] = "redirect"
                                 frappe.local.response["location"] = frappe.utils.get_url(
                                     "/payment-success?doctype={}&docname={}&redirect_message={}".format(
@@ -546,6 +554,12 @@ def lemonsqueezy_checkout(**kwargs):
                                     )
                                 )
                                 return
+                                
+                            # Use outstanding amount for payment
+                            if outstanding_amount > 0:
+                                kwargs["amount"] = outstanding_amount
+                                frappe.log_error(f"Using outstanding amount {outstanding_amount} for Sales Invoice {ref_dn}", "LemonSqueezy Debug")
+                                
                     except Exception as e:
                         # Log error but continue with payment flow
                         frappe.log_error(f"Error checking payment status: {str(e)}", "LemonSqueezy")

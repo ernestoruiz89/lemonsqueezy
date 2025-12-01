@@ -191,18 +191,6 @@ def process_order_created(data, settings):
                     )
                     should_mark_paid = False
 
-                # Verify payment status from LemonSqueezy order
-                order_status = attributes.get("status")
-                frappe.log_error(f"LemonSqueezy Order Status: {order_status} for Order {order_id}", "LemonSqueezy Debug")
-                
-                # Only mark as paid if LemonSqueezy confirms payment is complete
-                if order_status != "paid":
-                    frappe.log_error(
-    try:
-        order_id = str(order_data.get("id"))
-        
-        # Check if order already exists
-        if frappe.db.exists("LemonSqueezy Order", {"order_id": order_id}):
             frappe.log_error(f"Order {order_id} already exists")
             return
         

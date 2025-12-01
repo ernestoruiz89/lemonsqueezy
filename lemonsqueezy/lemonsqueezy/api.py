@@ -573,12 +573,9 @@ def lemonsqueezy_checkout(**kwargs):
                     )
                     if amount and float(amount) > 0:
                         kwargs["amount"] = amount
-                        frappe.log_error(f"Extracted amount {amount} from Payment Request {payment_request_id}", "LemonSqueezy Debug")
+                        frappe.log_error(f"Extracted amount from PR: {amount}", "LemonSqueezy")
                 except Exception as e:
-                    frappe.log_error(f"Error extracting amount from Payment Request: {str(e)}", "LemonSqueezy Error")
-
-        # Log the kwargs being passed to checkout
-        frappe.log_error(f"Checkout kwargs before calling get_api_checkout_url: {json.dumps(kwargs, indent=2)}", "LemonSqueezy Debug")
+                    frappe.log_error(f"Error extracting amount: {str(e)}", "LemonSqueezy")
 
         # Generate the checkout URL
         # kwargs contains arguments passed from Payment Request

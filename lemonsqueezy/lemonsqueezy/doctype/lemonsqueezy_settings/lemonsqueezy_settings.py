@@ -178,19 +178,15 @@ class LemonSqueezySettings(Document):
 
         # Handle custom price if amount is provided
         amount = kwargs.get("amount")
-        frappe.log_error(f"Amount received in get_api_checkout_url: {amount}, kwargs: {kwargs}", "LemonSqueezy Debug")
         if amount:
             # LemonSqueezy expects amount in cents (integer)
             amount_in_cents = cint(flt(amount) * 100)
             payload["data"]["attributes"]["custom_price"] = amount_in_cents
-            frappe.log_error(f"Setting custom_price to: {amount_in_cents} cents (${amount})", "LemonSqueezy Debug")
         else:
             # Remove custom_price if not needed
             del payload["data"]["attributes"]["custom_price"]
-            frappe.log_error("No amount provided, removing custom_price from payload", "LemonSqueezy Debug")
 
         try:
-            frappe.log_error(f"Final payload being sent to LemonSqueezy: {json.dumps(payload, indent=2)}", "LemonSqueezy Debug")
             response = requests.post(
                 "https://api.lemonsqueezy.com/v1/checkouts",
                 json=payload,

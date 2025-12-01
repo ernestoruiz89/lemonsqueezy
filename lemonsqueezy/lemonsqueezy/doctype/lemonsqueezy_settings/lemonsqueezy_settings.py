@@ -245,4 +245,3 @@ def test_connection(name):
 		return {"success": True, "message": _("Connection successful!")}
 	except Exception as e:
 		return {"success": False, "message": str(e)}
-

@@ -131,44 +131,44 @@ class LemonSqueezySettings(Document):
 		}
 		
 		# Construct minimal payload
-		payload = {
-			"data": {
-				"type": "checkouts",
-				"attributes": {
-					"custom_price": None  # Will be set if amount is provided
-				},
-				"relationships": {
-					"store": {
-						"data": {
-							"type": "stores",
-							"id": str(store_id)
-						}
-					},
-					"variant": {
-						"data": {
-							"type": "variants",
-							"id": str(variant_id)
-						}
-					}
-				}
-			}
-		}
+                payload = {
+                        "data": {
+                                "type": "checkouts",
+                                "attributes": {
+                                        "custom_price": None  # Will be set if amount is provided
+                                },
+                                "relationships": {
+                                        "store": {
+                                                "data": {
+                                                        "type": "stores",
+                                                        "id": str(store_id)
+                                                }
+                                        },
+                                        "variant": {
+                                                "data": {
+                                                        "type": "variants",
+                                                        "id": str(variant_id)
+                                                }
+                                        }
+                                }
+                        }
+                }
 
-		# Attach custom metadata so the webhook can correlate payments to ERPNext documents
-		custom_data = {
-			key: kwargs[key]
-			for key in ("payment_request_id", "reference_doctype", "reference_docname")
-			if kwargs.get(key)
-		}
+                # Attach custom metadata so the webhook can correlate payments to ERPNext documents
+                custom_data = {
+                        key: kwargs[key]
+                        for key in ("payment_request_id", "reference_doctype", "reference_docname")
+                        if kwargs.get(key)
+                }
 
-		if custom_data:
-			payload["data"]["attributes"]["custom"] = custom_data
+                if custom_data:
+                        payload["data"]["attributes"]["custom"] = custom_data
 
-		# Handle custom price if amount is provided
-		amount = kwargs.get("amount")
-		if amount:
-			# LemonSqueezy expects amount in cents (integer)
-			amount_in_cents = cint(flt(amount) * 100)
+                # Handle custom price if amount is provided
+                amount = kwargs.get("amount")
+                if amount:
+                        # LemonSqueezy expects amount in cents (integer)
+                        amount_in_cents = cint(flt(amount) * 100)
 			payload["data"]["attributes"]["custom_price"] = amount_in_cents
 		else:
 			# Remove custom_price if not needed

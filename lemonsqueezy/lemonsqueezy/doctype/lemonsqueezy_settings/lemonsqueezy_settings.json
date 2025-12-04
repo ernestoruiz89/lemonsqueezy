@@ -13,7 +13,10 @@
         "column_break_credentials",
         "webhook_secret",
         "section_break_settings",
-        "default_variant_id"
+        "default_variant_id",
+        "section_break_advanced",
+        "verbose_logging",
+        "sanitize_webhook_payload"
     ],
     "fields": [
         {
@@ -37,7 +40,7 @@
         },
         {
             "fieldname": "api_key",
-            "fieldtype": "Small Text",
+            "fieldtype": "Password",
             "label": "API Key",
             "reqd": 1
         },
@@ -53,7 +56,7 @@
         },
         {
             "fieldname": "webhook_secret",
-            "fieldtype": "Small Text",
+            "fieldtype": "Password",
             "label": "Webhook Secret",
             "description": "Secret for validating webhook signatures"
         },
@@ -67,11 +70,31 @@
             "fieldtype": "Data",
             "label": "Default Variant ID",
             "description": "Variant ID to use for generic payments (must support custom price if amount is variable)"
+        },
+        {
+            "fieldname": "section_break_advanced",
+            "fieldtype": "Section Break",
+            "label": "Advanced Settings",
+            "collapsible": 1
+        },
+        {
+            "default": "0",
+            "fieldname": "verbose_logging",
+            "fieldtype": "Check",
+            "label": "Enable Verbose Logging",
+            "description": "Enable detailed debug logging for troubleshooting"
+        },
+        {
+            "default": "0",
+            "fieldname": "sanitize_webhook_payload",
+            "fieldtype": "Check",
+            "label": "Sanitize Webhook Payload",
+            "description": "Remove sensitive data (emails, addresses) from stored webhook logs"
         }
     ],
     "issingle": 0,
     "links": [],
-    "modified": "2023-11-26 10:00:00.000000",
+    "modified": "2025-12-04 12:15:00.000000",
     "modified_by": "Administrator",
     "module": "LemonSqueezy",
     "name": "LemonSqueezy Settings",

@@ -8,6 +8,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from lemonsqueezy.lemonsqueezy.checkout import (
+    build_checkout_request,
     get_legacy_checkout_redirect_url,
     issue_checkout_token,
     validate_checkout_token,
@@ -95,8 +96,21 @@ class TestPaymentUrlIssuance(FrappeTestCase):
 
     def test_legacy_checkout_link_upgrades_payment_request_to_signed_token(self):
         with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=True,
+        ), patch(
             "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
-            return_value="LemonSqueezy-Standard",
+            side_effect=[
+                frappe._dict(
+                    {
+                        "reference_doctype": "Sales Invoice",
+                        "reference_name": "SINV-0001",
+                        "docstatus": 0,
+                        "status": "Requested",
+                    }
+                ),
+                "LemonSqueezy-Standard",
+            ],
         ), patch(
             "lemonsqueezy.lemonsqueezy.checkout.issue_checkout_token",
             return_value="signed-token",
@@ -106,8 +120,8 @@ class TestPaymentUrlIssuance(FrappeTestCase):
         ):
             url = get_legacy_checkout_redirect_url(
                 {
-                    "reference_doctype": "Payment Request",
-                    "reference_docname": "PR-0001",
+                    "reference_doctype": "Sales Invoice",
+                    "reference_docname": "SINV-0001",
                     "order_id": "PR-0001",
                     "amount": 99,
                     "currency": "USD",
@@ -117,13 +131,114 @@ class TestPaymentUrlIssuance(FrappeTestCase):
         issue_token.assert_called_once_with("PR-0001", "LemonSqueezy-Standard")
         self.assertEqual(url, "https://example.com/api/method/checkout?token=signed-token")
 
-    def test_legacy_checkout_link_rejects_non_payment_request_arguments(self):
-        url = get_legacy_checkout_redirect_url(
-            {
-                "reference_doctype": "Sales Invoice",
-                "reference_docname": "SINV-0001",
-                "order_id": "SINV-0001",
-            }
-        )
+    def test_legacy_checkout_link_rejects_reference_mismatch(self):
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            return_value=frappe._dict(
+                {
+                    "reference_doctype": "Sales Invoice",
+                    "reference_name": "SINV-0001",
+                    "docstatus": 0,
+                    "status": "Requested",
+                }
+            ),
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=True,
+        ):
+            url = get_legacy_checkout_redirect_url(
+                {
+                    "reference_doctype": "Sales Invoice",
+                    "reference_docname": "SINV-0002",
+                    "order_id": "PR-0001",
+                }
+            )
 
         self.assertIsNone(url)
+
+    def test_legacy_checkout_link_rejects_non_payment_request_arguments(self):
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=False,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            return_value=None,
+        ):
+            url = get_legacy_checkout_redirect_url(
+                {
+                    "reference_doctype": "Sales Invoice",
+                    "reference_docname": "SINV-0001",
+                    "order_id": "SINV-0001",
+                }
+            )
+
+        self.assertIsNone(url)
+
+    def test_build_checkout_request_uses_invoice_item_amount_for_custom_price(self):
+        payment_request = frappe._dict(
+            {
+                "name": "PR-0001",
+                "status": "Requested",
+                "reference_doctype": "Sales Invoice",
+                "reference_name": "SINV-0001",
+                "currency": "USD",
+                "email_to": "customer@example.com",
+                "party_name": "Customer",
+                "grand_total": 120,
+                "payment_amount": 120,
+                "total_amount_to_pay": 120,
+            }
+        )
+        invoice = frappe._dict(
+            {
+                "outstanding_amount": 120,
+                "status": "Unpaid",
+            }
+        )
+        settings = SimpleNamespace(verbose_logging=False)
+
+        def fake_get_doc(doctype, name):
+            if doctype == "Payment Request":
+                return payment_request
+            if doctype == "Sales Invoice":
+                return invoice
+            raise AssertionError(f"Unexpected doctype {doctype}")
+
+        def fake_get_all(doctype, **kwargs):
+            if doctype == "Sales Invoice Item":
+                return [
+                    frappe._dict(
+                        {
+                            "item_code": "ITEM-001",
+                            "subscription_plan": None,
+                            "net_amount": 99,
+                            "amount": 108,
+                            "base_net_amount": 99,
+                            "base_amount": 108,
+                        }
+                    )
+                ]
+            return []
+
+        def fake_get_value(doctype, name=None, fieldname=None, **kwargs):
+            if doctype == "Item" and name == "ITEM-001" and fieldname == "lemonsqueezy_variant_id":
+                return "VAR-001"
+            return None
+
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=True,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_doc",
+            side_effect=fake_get_doc,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_all",
+            side_effect=fake_get_all,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            side_effect=fake_get_value,
+        ):
+            checkout_request = build_checkout_request("PR-0001", settings)
+
+        self.assertEqual(checkout_request["checkout_kwargs"]["variant_id"], "VAR-001")
+        self.assertEqual(checkout_request["checkout_kwargs"]["amount"], 99)

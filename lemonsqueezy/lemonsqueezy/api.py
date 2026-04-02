@@ -664,8 +664,32 @@ def lemonsqueezy_checkout(token=None, **kwargs):
     Endpoint: /api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout
     """
     try:
-        if kwargs:
-            legacy_redirect_url = get_legacy_checkout_redirect_url(kwargs)
+        request_params = {
+            key: value
+            for key, value in (kwargs or {}).items()
+            if key not in {"cmd", "token", "_", "data"}
+        }
+
+        if token:
+            checkout_request = resolve_checkout_request_from_token(token)
+            redirect_url = checkout_request.get("redirect_url")
+            if redirect_url:
+                frappe.local.response["type"] = "redirect"
+                frappe.local.response["location"] = redirect_url
+                return
+
+            settings = checkout_request["settings"]
+            checkout_url = settings.get_api_checkout_url(**checkout_request["checkout_kwargs"])
+
+            if checkout_url:
+                frappe.local.response["type"] = "redirect"
+                frappe.local.response["location"] = checkout_url
+                return
+
+            frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
+
+        if request_params:
+            legacy_redirect_url = get_legacy_checkout_redirect_url(request_params)
             if legacy_redirect_url:
                 frappe.local.response["type"] = "redirect"
                 frappe.local.response["location"] = legacy_redirect_url
@@ -673,22 +697,6 @@ def lemonsqueezy_checkout(token=None, **kwargs):
             frappe.throw(_("Checkout links no longer accept free-form parameters."))
         if not token:
             frappe.throw(_("A valid checkout token is required."))
-
-        checkout_request = resolve_checkout_request_from_token(token)
-        redirect_url = checkout_request.get("redirect_url")
-        if redirect_url:
-            frappe.local.response["type"] = "redirect"
-            frappe.local.response["location"] = redirect_url
-            return
-
-        settings = checkout_request["settings"]
-        checkout_url = settings.get_api_checkout_url(**checkout_request["checkout_kwargs"])
-
-        if checkout_url:
-            frappe.local.response["type"] = "redirect"
-            frappe.local.response["location"] = checkout_url
-        else:
-            frappe.throw(_("Could not generate LemonSqueezy checkout URL"))
 
     except Exception as e:
         error_msg = str(e)

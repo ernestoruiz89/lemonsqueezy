@@ -7,6 +7,7 @@ from unittest.mock import patch
 from frappe.tests.utils import FrappeTestCase
 
 from lemonsqueezy.lemonsqueezy.doctype.lemonsqueezy_settings.lemonsqueezy_settings import (
+    _build_checkout_not_found_message,
     _can_access_customer_portal,
 )
 
@@ -71,3 +72,22 @@ class TestLemonSqueezySettings(FrappeTestCase):
             return_value=set(),
         ):
             self.assertFalse(_can_access_customer_portal(subscription, user="intruder@example.com"))
+
+    def test_checkout_not_found_message_highlights_missing_variant(self):
+        with patch(
+            "lemonsqueezy.lemonsqueezy.doctype.lemonsqueezy_settings.lemonsqueezy_settings._resource_exists",
+            side_effect=[True, False],
+        ):
+            message = _build_checkout_not_found_message("123", "456", headers={})
+
+        self.assertIn("Variant ID 456", message)
+        self.assertIn("not a Price ID", message)
+
+    def test_checkout_not_found_message_highlights_missing_store(self):
+        with patch(
+            "lemonsqueezy.lemonsqueezy.doctype.lemonsqueezy_settings.lemonsqueezy_settings._resource_exists",
+            side_effect=[False, None],
+        ):
+            message = _build_checkout_not_found_message("123", "456", headers={})
+
+        self.assertIn("Store ID 123", message)

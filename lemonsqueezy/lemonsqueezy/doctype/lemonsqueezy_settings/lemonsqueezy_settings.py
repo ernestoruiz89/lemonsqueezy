@@ -23,6 +23,59 @@ SUPPORTED_CURRENCIES = [
     "UZS", "VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW"
 ]
 
+
+def _get_json_api_error_detail(response):
+    try:
+        payload = response.json()
+    except Exception:
+        return None
+
+    errors = payload.get("errors") or []
+    if not errors:
+        return None
+
+    detail = errors[0].get("detail") or errors[0].get("title")
+    return str(detail).strip() if detail else None
+
+
+def _resource_exists(url, headers):
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+    except Exception:
+        return None
+
+    if response.status_code == 404:
+        return False
+    if 200 <= response.status_code < 300:
+        return True
+    return None
+
+
+def _build_checkout_not_found_message(store_id, variant_id, headers):
+    store_exists = _resource_exists(
+        f"https://api.lemonsqueezy.com/v1/stores/{store_id}",
+        headers,
+    )
+    variant_exists = _resource_exists(
+        f"https://api.lemonsqueezy.com/v1/variants/{variant_id}",
+        headers,
+    )
+
+    if store_exists is False:
+        return _(
+            "Store ID {0} was not found for this API key. Verify the Store ID and make sure the API key is in the same mode (test/live) as the store."
+        ).format(store_id)
+
+    if variant_exists is False:
+        return _(
+            "Variant ID {0} was not found for this API key. Verify that you configured a LemonSqueezy Variant ID, not a Price ID, and make sure the API key is in the same mode (test/live) as the variant."
+        ).format(variant_id)
+
+    return _(
+        "LemonSqueezy could not create the checkout for Store ID {0} and Variant ID {1}. Verify that the variant belongs to the configured store and that all resources use the same mode (test/live)."
+    ).format(store_id, variant_id)
+
+
 class LemonSqueezySettings(Document):
     # Define supported currencies for payment gateway integration
     supported_currencies = SUPPORTED_CURRENCIES
@@ -210,10 +263,19 @@ class LemonSqueezySettings(Document):
         except requests.exceptions.HTTPError as e:
             status_code = getattr(e.response, "status_code", "unknown")
             request_id = getattr(e.response, "headers", {}).get("X-Request-Id", "n/a") if getattr(e, "response", None) else "n/a"
+            detail = _get_json_api_error_detail(e.response) if getattr(e, "response", None) else None
+            message = (
+                f"LemonSqueezy API Error: status={status_code}, request_id={request_id}, "
+                f"store_id={store_id}, variant_id={variant_id}, reference={kwargs.get('reference_doctype')}:{kwargs.get('reference_docname')}"
+            )
+            if detail:
+                message += f", detail={detail[:300]}"
             frappe.log_error(
-                message=f"LemonSqueezy API Error: status={status_code}, request_id={request_id}",
+                message=message,
                 title="LemonSqueezy API Error",
             )
+            if status_code == 404:
+                frappe.throw(_build_checkout_not_found_message(store_id, variant_id, headers))
             frappe.throw(_("Failed to create LemonSqueezy checkout. Please check Error Log for details."))
         except Exception as e:
             frappe.log_error(

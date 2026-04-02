@@ -7,7 +7,11 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from lemonsqueezy.lemonsqueezy.checkout import issue_checkout_token, validate_checkout_token
+from lemonsqueezy.lemonsqueezy.checkout import (
+    get_legacy_checkout_redirect_url,
+    issue_checkout_token,
+    validate_checkout_token,
+)
 from lemonsqueezy.lemonsqueezy.doctype.lemonsqueezy_settings.lemonsqueezy_settings import (
     LemonSqueezySettings,
 )
@@ -85,6 +89,41 @@ class TestPaymentUrlIssuance(FrappeTestCase):
             settings,
             reference_doctype="Sales Invoice",
             reference_docname="SINV-0001",
+        )
+
+        self.assertIsNone(url)
+
+    def test_legacy_checkout_link_upgrades_payment_request_to_signed_token(self):
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            return_value="LemonSqueezy-Standard",
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.issue_checkout_token",
+            return_value="signed-token",
+        ) as issue_token, patch(
+            "lemonsqueezy.lemonsqueezy.checkout.get_checkout_redirect_url",
+            return_value="https://example.com/api/method/checkout?token=signed-token",
+        ):
+            url = get_legacy_checkout_redirect_url(
+                {
+                    "reference_doctype": "Payment Request",
+                    "reference_docname": "PR-0001",
+                    "order_id": "PR-0001",
+                    "amount": 99,
+                    "currency": "USD",
+                }
+            )
+
+        issue_token.assert_called_once_with("PR-0001", "LemonSqueezy-Standard")
+        self.assertEqual(url, "https://example.com/api/method/checkout?token=signed-token")
+
+    def test_legacy_checkout_link_rejects_non_payment_request_arguments(self):
+        url = get_legacy_checkout_redirect_url(
+            {
+                "reference_doctype": "Sales Invoice",
+                "reference_docname": "SINV-0001",
+                "order_id": "SINV-0001",
+            }
         )
 
         self.assertIsNone(url)

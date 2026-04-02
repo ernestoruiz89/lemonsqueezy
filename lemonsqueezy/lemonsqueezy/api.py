@@ -6,7 +6,10 @@ from frappe import _
 from frappe.utils import get_datetime, nowdate, flt
 from erpnext.setup.utils import get_exchange_rate
 
-from lemonsqueezy.lemonsqueezy.checkout import resolve_checkout_request_from_token
+from lemonsqueezy.lemonsqueezy.checkout import (
+    get_legacy_checkout_redirect_url,
+    resolve_checkout_request_from_token,
+)
 
 # Supported webhook events
 SUPPORTED_EVENTS = [
@@ -662,6 +665,11 @@ def lemonsqueezy_checkout(token=None, **kwargs):
     """
     try:
         if kwargs:
+            legacy_redirect_url = get_legacy_checkout_redirect_url(kwargs)
+            if legacy_redirect_url:
+                frappe.local.response["type"] = "redirect"
+                frappe.local.response["location"] = legacy_redirect_url
+                return
             frappe.throw(_("Checkout links no longer accept free-form parameters."))
         if not token:
             frappe.throw(_("A valid checkout token is required."))

@@ -14,6 +14,12 @@
         "webhook_secret",
         "section_break_settings",
         "default_variant_id",
+        "section_break_direct_orders",
+        "default_company",
+        "default_payment_gateway_account",
+        "column_break_direct_orders",
+        "default_customer_group",
+        "default_territory",
         "section_break_advanced",
         "verbose_logging",
         "sanitize_webhook_payload"
@@ -70,6 +76,43 @@
             "fieldtype": "Data",
             "label": "Default Variant ID",
             "description": "Variant ID to use for generic payments (must support custom price if amount is variable)"
+        },
+        {
+            "fieldname": "section_break_direct_orders",
+            "fieldtype": "Section Break",
+            "label": "Direct Order Sync"
+        },
+        {
+            "fieldname": "default_company",
+            "fieldtype": "Link",
+            "label": "Default Company",
+            "options": "Company",
+            "description": "Used when a webhook must create ERPNext documents without an existing Payment Request"
+        },
+        {
+            "fieldname": "default_payment_gateway_account",
+            "fieldtype": "Link",
+            "label": "Default Payment Gateway Account",
+            "options": "Payment Gateway Account",
+            "description": "Fallback gateway account for direct LemonSqueezy orders and renewals"
+        },
+        {
+            "fieldname": "column_break_direct_orders",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "default_customer_group",
+            "fieldtype": "Link",
+            "label": "Default Customer Group",
+            "options": "Customer Group",
+            "description": "Used when LemonSqueezy creates a new ERPNext customer from a webhook"
+        },
+        {
+            "fieldname": "default_territory",
+            "fieldtype": "Link",
+            "label": "Default Territory",
+            "options": "Territory",
+            "description": "Used when LemonSqueezy creates a new ERPNext customer from a webhook"
         },
         {
             "fieldname": "section_break_advanced",

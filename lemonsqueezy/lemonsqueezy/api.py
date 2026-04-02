@@ -164,6 +164,471 @@ def get_existing_payment_entry(order_id):
 
     return frappe.get_doc("Payment Entry", payment_entry.name)
 
+
+def _normalize_email(value):
+    return (value or "").strip().lower()
+
+
+def _get_first_leaf_record(doctype):
+    if not frappe.db.exists("DocType", doctype):
+        return None
+
+    filters = {}
+    if frappe.db.has_column(doctype, "is_group"):
+        filters["is_group"] = 0
+
+    rows = frappe.get_all(
+        doctype,
+        filters=filters,
+        pluck="name",
+        limit=1,
+        order_by="lft asc" if frappe.db.has_column(doctype, "lft") else "creation asc",
+    )
+    return rows[0] if rows else None
+
+
+def _find_customer_by_email(user_email):
+    normalized_email = _normalize_email(user_email)
+    if not normalized_email:
+        return None
+
+    customer = frappe.db.get_value("Customer", {"email_id": normalized_email}, "name")
+    if customer:
+        return customer
+
+    linked_customer = frappe.db.sql(
+        """
+        SELECT dl.link_name
+        FROM `tabContact` c
+        JOIN `tabContact Email` ce ON ce.parent = c.name
+        JOIN `tabDynamic Link` dl ON dl.parent = c.name
+        WHERE ce.email_id = %s
+        AND dl.link_doctype = 'Customer'
+        LIMIT 1
+        """,
+        (normalized_email,),
+        as_dict=1,
+    )
+    return linked_customer[0].link_name if linked_customer else None
+
+
+def _get_customer_creation_defaults(settings):
+    return {
+        "customer_group": getattr(settings, "default_customer_group", None) or _get_first_leaf_record("Customer Group"),
+        "territory": getattr(settings, "default_territory", None) or _get_first_leaf_record("Territory"),
+    }
+
+
+def _guess_customer_name(user_email, user_name=None):
+    if user_name and str(user_name).strip():
+        return str(user_name).strip()
+    normalized_email = _normalize_email(user_email)
+    if normalized_email:
+        return normalized_email.split("@", 1)[0].replace(".", " ").replace("_", " ").title()
+    return _("LemonSqueezy Customer")
+
+
+def _ensure_contact_for_customer(customer_name, user_email, user_name=None):
+    normalized_email = _normalize_email(user_email)
+    if not customer_name or not normalized_email or not frappe.db.exists("DocType", "Contact"):
+        return
+
+    existing_contact = frappe.db.sql(
+        """
+        SELECT c.name
+        FROM `tabContact` c
+        JOIN `tabContact Email` ce ON ce.parent = c.name
+        JOIN `tabDynamic Link` dl ON dl.parent = c.name
+        WHERE ce.email_id = %s
+        AND dl.link_doctype = 'Customer'
+        AND dl.link_name = %s
+        LIMIT 1
+        """,
+        (normalized_email, customer_name),
+        as_dict=1,
+    )
+    if existing_contact:
+        return
+
+    name_parts = (_guess_customer_name(user_email, user_name) or "").split()
+    first_name = name_parts[0] if name_parts else normalized_email
+    last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else None
+
+    try:
+        contact = frappe.get_doc(
+            {
+                "doctype": "Contact",
+                "first_name": first_name,
+                "last_name": last_name,
+                "links": [
+                    {
+                        "link_doctype": "Customer",
+                        "link_name": customer_name,
+                    }
+                ],
+                "email_ids": [
+                    {
+                        "email_id": normalized_email,
+                        "is_primary": 1,
+                    }
+                ],
+            }
+        )
+        contact.insert(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"LemonSqueezy: failed to create Contact for customer {customer_name}",
+        )
+
+
+def ensure_customer_for_webhook(user_email, settings, user_name=None):
+    normalized_email = _normalize_email(user_email)
+    if not normalized_email or not frappe.db.exists("DocType", "Customer"):
+        return None
+
+    customer = _find_customer_by_email(normalized_email)
+    if customer:
+        _ensure_contact_for_customer(customer, normalized_email, user_name=user_name)
+        return customer
+
+    defaults = _get_customer_creation_defaults(settings)
+    if not defaults["customer_group"] or not defaults["territory"]:
+        frappe.log_error(
+            f"LemonSqueezy direct order could not create Customer for {normalized_email}: missing customer_group or territory defaults",
+            "LemonSqueezy Customer Sync",
+        )
+        return None
+
+    customer_doc = frappe.new_doc("Customer")
+    customer_doc.customer_name = _guess_customer_name(normalized_email, user_name=user_name)
+    if hasattr(customer_doc, "customer_type"):
+        customer_doc.customer_type = "Individual"
+    customer_doc.customer_group = defaults["customer_group"]
+    customer_doc.territory = defaults["territory"]
+    if frappe.db.has_column("Customer", "email_id"):
+        customer_doc.email_id = normalized_email
+    customer_doc.insert(ignore_permissions=True)
+
+    _ensure_contact_for_customer(customer_doc.name, normalized_email, user_name=user_name)
+    return customer_doc.name
+
+
+def _resolve_variant_mapping(variant_id):
+    variant_id = str(variant_id or "").strip()
+    if not variant_id:
+        return {}
+
+    item_code = None
+    if frappe.db.has_column("Item", "lemonsqueezy_variant_id"):
+        item_code = frappe.db.get_value("Item", {"lemonsqueezy_variant_id": variant_id}, "name")
+    if item_code:
+        return {"item_code": item_code, "subscription_plan": None}
+
+    if not frappe.db.exists("DocType", "Subscription Plan") or not frappe.db.has_column("Subscription Plan", "product_price_id"):
+        return {}
+
+    subscription_plan = frappe.db.get_value("Subscription Plan", {"product_price_id": variant_id}, "name")
+    if not subscription_plan:
+        return {}
+
+    item_field = None
+    for fieldname in ("item", "item_code"):
+        if frappe.db.has_column("Subscription Plan", fieldname):
+            item_field = fieldname
+            break
+
+    mapped_item = frappe.db.get_value("Subscription Plan", subscription_plan, item_field) if item_field else None
+    return {
+        "item_code": mapped_item,
+        "subscription_plan": subscription_plan,
+    }
+
+
+def _get_gateway_account_context(settings, currency=None):
+    if not frappe.db.exists("DocType", "Payment Gateway Account"):
+        return {}
+
+    fields = [field for field in ("name", "company", "payment_account", "currency") if frappe.db.has_column("Payment Gateway Account", field)]
+    if not fields:
+        return {}
+
+    gateway_account_name = getattr(settings, "default_payment_gateway_account", None)
+    if gateway_account_name and frappe.db.exists("Payment Gateway Account", gateway_account_name):
+        row = frappe.db.get_value("Payment Gateway Account", gateway_account_name, fields, as_dict=1)
+        return row or {}
+
+    filters = {}
+    if frappe.db.has_column("Payment Gateway Account", "payment_gateway"):
+        filters["payment_gateway"] = ["like", "LemonSqueezy%"]
+    if getattr(settings, "default_company", None) and frappe.db.has_column("Payment Gateway Account", "company"):
+        filters["company"] = settings.default_company
+    if currency and frappe.db.has_column("Payment Gateway Account", "currency"):
+        filters["currency"] = currency
+
+    rows = frappe.get_all(
+        "Payment Gateway Account",
+        filters=filters,
+        fields=fields,
+        limit=1,
+        order_by="modified desc",
+    )
+    if rows:
+        return rows[0]
+
+    if currency and "currency" in filters:
+        filters.pop("currency")
+        rows = frappe.get_all(
+            "Payment Gateway Account",
+            filters=filters,
+            fields=fields,
+            limit=1,
+            order_by="modified desc",
+        )
+        if rows:
+            return rows[0]
+
+    return {}
+
+
+def _get_direct_order_context(order_context, settings):
+    gateway_context = _get_gateway_account_context(settings, currency=order_context.get("paid_currency"))
+    company = getattr(settings, "default_company", None) or gateway_context.get("company")
+    payment_account = gateway_context.get("payment_account")
+    return {
+        "company": company,
+        "payment_account": payment_account,
+        "gateway_account": gateway_context.get("name"),
+        "currency": gateway_context.get("currency"),
+    }
+
+
+def _build_sales_invoice_item(mapping, order_context):
+    item = {
+        "item_code": mapping["item_code"],
+        "qty": 1,
+        "rate": flt(order_context["paid_amount"]),
+        "amount": flt(order_context["paid_amount"]),
+        "description": order_context.get("variant_name") or order_context.get("product_name") or mapping["item_code"],
+    }
+
+    if mapping.get("subscription_plan") and frappe.db.has_column("Sales Invoice Item", "subscription_plan"):
+        item["subscription_plan"] = mapping["subscription_plan"]
+
+    return item
+
+
+def create_direct_sales_invoice(order_context, settings, customer_name, mapping, gateway_context):
+    if not customer_name or not mapping.get("item_code") or not gateway_context.get("company"):
+        return None
+
+    posting_date = get_datetime(order_context.get("order_date")).date() if order_context.get("order_date") else nowdate()
+    company_currency = frappe.get_cached_value("Company", gateway_context["company"], "default_currency")
+
+    invoice = frappe.new_doc("Sales Invoice")
+    invoice.customer = customer_name
+    invoice.company = gateway_context["company"]
+    invoice.posting_date = posting_date
+    invoice.due_date = posting_date
+    if hasattr(invoice, "set_posting_time"):
+        invoice.set_posting_time = 1
+    if hasattr(invoice, "ignore_pricing_rule"):
+        invoice.ignore_pricing_rule = 1
+    if hasattr(invoice, "update_stock"):
+        invoice.update_stock = 0
+    if order_context.get("paid_currency") and hasattr(invoice, "currency"):
+        invoice.currency = order_context["paid_currency"]
+        if company_currency and company_currency != order_context["paid_currency"] and hasattr(invoice, "conversion_rate"):
+            invoice.conversion_rate = get_exchange_rate(order_context["paid_currency"], company_currency, posting_date)
+    invoice.remarks = (
+        f"Recorded from LemonSqueezy order {order_context['order_id']}. "
+        f"Product: {order_context.get('product_name') or mapping['item_code']}. "
+        f"Variant: {order_context.get('variant_id') or 'n/a'}."
+    )
+    invoice.append("items", _build_sales_invoice_item(mapping, order_context))
+    invoice.insert(ignore_permissions=True)
+    invoice.submit()
+    return invoice.name
+
+
+def create_direct_payment_entry(order_context, invoice_name, gateway_context):
+    if not invoice_name or not gateway_context.get("payment_account"):
+        return None
+
+    existing_payment_entry = get_existing_payment_entry(order_context["order_id"])
+    if existing_payment_entry:
+        if existing_payment_entry.docstatus == 0:
+            existing_payment_entry.submit()
+        return existing_payment_entry.name
+
+    from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+    payment_date = get_datetime(order_context.get("order_date")).date() if order_context.get("order_date") else nowdate()
+    company_currency = frappe.get_cached_value("Company", gateway_context["company"], "default_currency")
+    account_currency = (
+        frappe.get_value("Account", gateway_context["payment_account"], "account_currency")
+        or company_currency
+    )
+
+    bank_amount = flt(order_context["paid_amount"])
+    if order_context.get("paid_currency") and account_currency and order_context["paid_currency"] != account_currency:
+        bank_amount = flt(order_context["paid_amount"]) * flt(
+            get_exchange_rate(order_context["paid_currency"], account_currency, payment_date)
+        )
+
+    payment_entry = get_payment_entry(
+        dt="Sales Invoice",
+        dn=invoice_name,
+        bank_account=gateway_context["payment_account"],
+        bank_amount=bank_amount,
+    )
+    payment_entry.payment_type = "Receive"
+    if frappe.db.exists("Mode of Payment", "LemonSqueezy"):
+        payment_entry.mode_of_payment = "LemonSqueezy"
+    payment_entry.reference_no = order_context["order_id"]
+    payment_entry.reference_date = payment_date
+    payment_entry.posting_date = payment_date
+    payment_entry.paid_amount = flt(bank_amount)
+    payment_entry.received_amount = flt(bank_amount)
+    if payment_entry.references:
+        for ref in payment_entry.references:
+            if ref.allocated_amount > payment_entry.paid_amount:
+                ref.allocated_amount = payment_entry.paid_amount
+    payment_entry.remarks = (
+        f"Payment received via LemonSqueezy for Sales Invoice {invoice_name}. "
+        f"Order ID: {order_context['order_id']}."
+    )
+    payment_entry.insert(ignore_permissions=True)
+    payment_entry.submit()
+    return payment_entry.name
+
+
+def sync_direct_order_to_erpnext(order_context, settings, existing_order=None):
+    if not order_context.get("order_id"):
+        return {}
+
+    result = {
+        "customer": existing_order.customer if existing_order and getattr(existing_order, "customer", None) else None,
+        "sales_invoice": existing_order.sales_invoice if existing_order and getattr(existing_order, "sales_invoice", None) else None,
+        "payment_entry_name": existing_order.payment_entry if existing_order and getattr(existing_order, "payment_entry", None) else None,
+    }
+
+    customer_name = ensure_customer_for_webhook(
+        order_context.get("user_email"),
+        settings,
+        user_name=order_context.get("user_name"),
+    )
+    if customer_name:
+        result["customer"] = customer_name
+
+    mapping = _resolve_variant_mapping(order_context.get("variant_id"))
+    if not mapping.get("item_code"):
+        debug_log(
+            settings,
+            f"No ERPNext item mapping found for LemonSqueezy variant {order_context.get('variant_id')}",
+            "LemonSqueezy Direct Order",
+        )
+        return result
+
+    gateway_context = _get_direct_order_context(order_context, settings)
+    if not gateway_context.get("company") or not gateway_context.get("payment_account"):
+        frappe.log_error(
+            f"LemonSqueezy direct order {order_context['order_id']} could not resolve company/payment account configuration",
+            "LemonSqueezy Direct Order",
+        )
+        return result
+
+    current_user = frappe.session.user
+    try:
+        frappe.set_user("Administrator")
+        if not result["sales_invoice"]:
+            result["sales_invoice"] = create_direct_sales_invoice(
+                order_context,
+                settings,
+                result["customer"],
+                mapping,
+                gateway_context,
+            )
+
+        if result["sales_invoice"] and not result["payment_entry_name"]:
+            result["payment_entry_name"] = create_direct_payment_entry(
+                order_context,
+                result["sales_invoice"],
+                gateway_context,
+            )
+    finally:
+        frappe.set_user(current_user)
+
+    return result
+
+
+def _build_order_context_from_order_created(order_data, attributes):
+    first_item = attributes.get("first_order_item", {}) or {}
+    first_subscription_item = attributes.get("first_subscription_item", {}) or {}
+    return {
+        "order_id": str(order_data.get("id") or "").strip(),
+        "paid_amount": (attributes.get("total") or 0) / 100,
+        "paid_currency": (attributes.get("currency") or "USD").upper(),
+        "order_date": attributes.get("created_at"),
+        "user_email": attributes.get("user_email"),
+        "user_name": attributes.get("user_name") or attributes.get("customer_name"),
+        "product_name": first_item.get("product_name"),
+        "variant_name": first_item.get("variant_name"),
+        "variant_id": str(first_item.get("variant_id") or first_subscription_item.get("variant_id") or "").strip(),
+        "subscription_id": str(first_subscription_item.get("subscription_id") or "").strip(),
+        "is_subscription": bool(first_subscription_item.get("subscription_id")),
+    }
+
+
+def _build_order_context_from_subscription_payment(attributes):
+    return {
+        "order_id": str(attributes.get("order_id") or "").strip(),
+        "paid_amount": (attributes.get("total") or 0) / 100,
+        "paid_currency": (attributes.get("currency") or "USD").upper(),
+        "order_date": attributes.get("created_at") or attributes.get("updated_at"),
+        "user_email": attributes.get("user_email"),
+        "user_name": attributes.get("user_name") or attributes.get("customer_name"),
+        "product_name": attributes.get("product_name"),
+        "variant_name": attributes.get("variant_name"),
+        "variant_id": str(attributes.get("variant_id") or "").strip(),
+        "subscription_id": str(attributes.get("subscription_id") or "").strip(),
+        "is_subscription": True,
+    }
+
+
+def upsert_lemonsqueezy_order(order_context, customer_name=None, sales_invoice=None, payment_entry=None, subscription_name=None):
+    if not order_context.get("order_id"):
+        return None
+
+    existing_name = frappe.db.get_value("LemonSqueezy Order", {"order_id": order_context["order_id"]}, "name")
+    if existing_name:
+        order_doc = frappe.get_doc("LemonSqueezy Order", existing_name)
+    else:
+        order_doc = frappe.new_doc("LemonSqueezy Order")
+        order_doc.order_id = order_context["order_id"]
+
+    order_doc.status = "Paid"
+    order_doc.source_system = "lemonsqueezy"
+    order_doc.customer = customer_name or order_doc.customer
+    order_doc.customer_email = order_context.get("user_email")
+    order_doc.sales_invoice = sales_invoice or getattr(order_doc, "sales_invoice", None)
+    order_doc.payment_entry = payment_entry or getattr(order_doc, "payment_entry", None)
+    order_doc.subscription_id = order_context.get("subscription_id") or order_doc.subscription_id
+    order_doc.subscription = subscription_name or order_doc.subscription
+    order_doc.order_date = get_datetime(order_context.get("order_date")).replace(tzinfo=None) if order_context.get("order_date") else order_doc.order_date
+    order_doc.total = flt(order_context.get("paid_amount"))
+    order_doc.currency = order_context.get("paid_currency") or order_doc.currency
+    order_doc.product_name = order_context.get("product_name") or order_doc.product_name
+    order_doc.variant_name = order_context.get("variant_name") or order_doc.variant_name
+    order_doc.variant_id = order_context.get("variant_id") or order_doc.variant_id
+    order_doc.is_subscription = 1 if order_context.get("is_subscription") else 0
+
+    if existing_name:
+        order_doc.save(ignore_permissions=True)
+    else:
+        order_doc.insert(ignore_permissions=True)
+    return order_doc
+
 @frappe.whitelist(allow_guest=True)
 def handle_webhook():
     """
@@ -304,10 +769,15 @@ def process_order_created(data, settings):
     order_data = data.get("data", {})
     attributes = order_data.get("attributes", {})
     payment_entry_name = None
+    sales_invoice_name = None
 
     paid_amount = (attributes.get("total") or 0) / 100
     paid_currency = (attributes.get("currency") or "USD").upper()
     order_id = str(order_data.get("id"))
+    order_context = _build_order_context_from_order_created(order_data, attributes)
+    existing_order_name = frappe.db.get_value("LemonSqueezy Order", {"order_id": order_id}, "name")
+    existing_order = frappe.get_doc("LemonSqueezy Order", existing_order_name) if existing_order_name else None
+    customer_name = existing_order.customer if existing_order and getattr(existing_order, "customer", None) else _find_customer_by_email(order_context.get("user_email"))
 
     custom_data = data.get("meta", {}).get("custom_data", {})
     payment_request_id = custom_data.get("payment_request_id")
@@ -431,6 +901,8 @@ def process_order_created(data, settings):
                             pr.status = "Paid"
                             pr.db_set("status", "Paid")
                             pr.run_method("on_payment_authorized", "Completed")
+                        if not customer_name:
+                            customer_name = _find_customer_by_email(order_context.get("user_email"))
                     except Exception as pe_error:
                         frappe.log_error(
                             f"Error creating Payment Entry for PR {payment_request_id}: {str(pe_error)}\n{frappe.get_traceback()}",
@@ -443,59 +915,45 @@ def process_order_created(data, settings):
         except Exception as e:
             frappe.log_error(f"Error processing order_created for PR {payment_request_id}: {str(e)}")
             raise
+    else:
+        erpnext_sync = sync_direct_order_to_erpnext(order_context, settings, existing_order=existing_order)
+        customer_name = erpnext_sync.get("customer") or customer_name
+        sales_invoice_name = erpnext_sync.get("sales_invoice")
+        payment_entry_name = erpnext_sync.get("payment_entry_name")
+
+    subscription_link_name = None
+    if order_context.get("subscription_id"):
+        subscription_link_name = frappe.db.get_value(
+            "LemonSqueezy Subscription",
+            {"subscription_id": order_context["subscription_id"]},
+            "name",
+        )
 
     # Store order data in LemonSqueezy Order
     try:
-        # Check if order already exists
-        if frappe.db.exists("LemonSqueezy Order", {"order_id": order_id}):
-            return {"payment_entry_name": payment_entry_name}
-        
-        # Validate currency exists in system
-        currency_code = (attributes.get("currency") or "USD").upper()
-        if not frappe.db.exists("Currency", currency_code):
-            frappe.log_error(f"Currency {currency_code} not found, defaulting to USD", "LemonSqueezy Validation")
-            currency_code = "USD"
-        
-        # Create new order
-        order_doc = frappe.new_doc("LemonSqueezy Order")
-        order_doc.order_id = order_id
-        order_doc.status = "Paid"
-        order_doc.customer_email = attributes.get("user_email")
-        
-        # Amounts (convert from cents to currency)
-        order_doc.total = (attributes.get("total") or 0) / 100
+        order_doc = upsert_lemonsqueezy_order(
+            order_context,
+            customer_name=customer_name,
+            sales_invoice=sales_invoice_name,
+            payment_entry=payment_entry_name,
+            subscription_name=subscription_link_name,
+        )
+        first_item = attributes.get("first_order_item", {}) or {}
         order_doc.subtotal = (attributes.get("subtotal") or 0) / 100
         order_doc.discount_total = (attributes.get("discount_total") or 0) / 100
         order_doc.tax = (attributes.get("tax") or 0) / 100
-        order_doc.currency = currency_code
-        
-        # Dates
-        dt = get_datetime(attributes.get("created_at"))
-        order_doc.order_date = dt.replace(tzinfo=None) if dt else None
-        
-        # Product info
-        first_item = attributes.get("first_order_item", {})
-        order_doc.product_id = str(first_item.get("product_id")) if first_item.get("product_id") else None
-        order_doc.variant_id = str(first_item.get("variant_id")) if first_item.get("variant_id") else None
-        order_doc.product_name = first_item.get("product_name")
-        order_doc.variant_name = first_item.get("variant_name")
-        
-        # Subscription info
-        subscription_id = attributes.get("first_subscription_item", {}).get("subscription_id")
-        if subscription_id:
-            order_doc.subscription_id = str(subscription_id)
-            order_doc.is_subscription = 1
-            
-            # Try to get billing interval from subscription
+        order_doc.product_id = str(first_item.get("product_id")) if first_item.get("product_id") else order_doc.product_id
+        order_doc.first_order = 1 if first_item.get("price_id") is not None else order_doc.first_order
+
+        if order_context.get("subscription_id") and not order_doc.billing_interval:
             try:
                 sub = frappe.db.get_value(
                     "LemonSqueezy Subscription",
-                    {"subscription_id": str(subscription_id)},
+                    {"subscription_id": order_context["subscription_id"]},
                     ["variant_name"],
                     as_dict=1
                 )
                 if sub and sub.variant_name:
-                    # Try to detect interval from variant name
                     variant_lower = sub.variant_name.lower()
                     if "month" in variant_lower:
                         order_doc.billing_interval = "Monthly"
@@ -503,19 +961,18 @@ def process_order_created(data, settings):
                         order_doc.billing_interval = "Yearly"
                     elif "week" in variant_lower:
                         order_doc.billing_interval = "Weekly"
-            except:
+            except Exception:
                 pass
-        
-        # First order check
-        order_doc.first_order = attributes.get("first_order_item", {}).get("price_id") is not None
-        
-        order_doc.insert(ignore_permissions=True)
-        
+
+        order_doc.save(ignore_permissions=True)
     except Exception as e:
         frappe.log_error(f"Error storing order data: {str(e)}\\n{frappe.get_traceback()}", "LemonSqueezy Order Error")
         raise
 
-    return {"payment_entry_name": payment_entry_name}
+    return {
+        "payment_entry_name": payment_entry_name,
+        "sales_invoice": sales_invoice_name,
+    }
 
 def process_subscription_event(data, settings, event_name):
     """Process subscription-related webhook events"""
@@ -633,29 +1090,24 @@ def process_subscription_event(data, settings, event_name):
         elif "week" in variant_lower:
             doc.billing_interval = "Weekly"
 
-    # Try to link to a Customer if email matches
-    if not doc.customer and user_email:
-        # First try direct email_id match on Customer
-        customer = frappe.db.get_value("Customer", {"email_id": user_email}, "name")
-        
-        # If not found, search in Contact with link to Customer
-        if not customer:
-            contact = frappe.db.sql("""
-                SELECT dl.link_name 
-                FROM `tabContact` c
-                JOIN `tabContact Email` ce ON ce.parent = c.name
-                JOIN `tabDynamic Link` dl ON dl.parent = c.name
-                WHERE ce.email_id = %s 
-                AND dl.link_doctype = 'Customer'
-                LIMIT 1
-            """, (user_email,), as_dict=1)
-            if contact:
-                customer = contact[0].link_name
-        
-        if customer:
-            doc.customer = customer
+    customer = ensure_customer_for_webhook(user_email, settings, user_name=attributes.get("user_name") or attributes.get("customer_name"))
+    if customer:
+        doc.customer = customer
             
     doc.save(ignore_permissions=True)
+
+    if event_name == "subscription_payment_success" and order_id:
+        order_context = _build_order_context_from_subscription_payment(attributes)
+        existing_order_name = frappe.db.get_value("LemonSqueezy Order", {"order_id": order_id}, "name")
+        existing_order = frappe.get_doc("LemonSqueezy Order", existing_order_name) if existing_order_name else None
+        erpnext_sync = sync_direct_order_to_erpnext(order_context, settings, existing_order=existing_order)
+        upsert_lemonsqueezy_order(
+            order_context,
+            customer_name=erpnext_sync.get("customer") or customer,
+            sales_invoice=erpnext_sync.get("sales_invoice"),
+            payment_entry=erpnext_sync.get("payment_entry_name"),
+            subscription_name=doc.name,
+        )
 
 @frappe.whitelist(allow_guest=True)
 def lemonsqueezy_checkout(token=None, **kwargs):

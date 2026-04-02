@@ -6,12 +6,15 @@
  "engine": "InnoDB",
  "field_order": [
   "status",
+  "source_system",
   "customer",
   "customer_email",
   "section_break_order_info",
   "order_id",
   "subscription_id",
   "subscription",
+  "sales_invoice",
+  "payment_entry",
   "column_break_order_info",
   "order_date",
   "refunded_at",
@@ -41,6 +44,13 @@
    "label": "Status",
    "options": "Pending\nPaid\nRefunded\nFailed",
    "reqd": 1
+  },
+  {
+   "default": "lemonsqueezy",
+   "fieldname": "source_system",
+   "fieldtype": "Select",
+   "label": "Source System",
+   "options": "lemonsqueezy\nerpnext"
   },
   {
    "fieldname": "customer",
@@ -78,6 +88,18 @@
    "fieldtype": "Link",
    "label": "Subscription",
    "options": "LemonSqueezy Subscription"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry"
   },
   {
    "fieldname": "column_break_order_info",

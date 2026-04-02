@@ -327,3 +327,48 @@ class TestPaymentUrlIssuance(FrappeTestCase):
 
         self.assertEqual(checkout_request["checkout_kwargs"]["variant_id"], "VAR-PLAN-001")
         self.assertEqual(checkout_request["checkout_kwargs"]["amount"], 99)
+
+    def test_build_checkout_request_keeps_payment_request_amount_over_invoice_outstanding(self):
+        payment_request = frappe._dict(
+            {
+                "name": "ACC-PRQ-2026-00007",
+                "status": "Initiated",
+                "reference_doctype": "Sales Invoice",
+                "reference_name": "INV-2026-012",
+                "currency": "USD",
+                "grand_total": 25,
+                "payment_amount": 25,
+                "total_amount_to_pay": 25,
+            }
+        )
+        invoice = frappe._dict(
+            {
+                "outstanding_amount": 915.61,
+                "status": "Unpaid",
+            }
+        )
+        settings = SimpleNamespace(verbose_logging=False)
+
+        def fake_get_doc(doctype, name):
+            if doctype == "Payment Request":
+                return payment_request
+            if doctype == "Sales Invoice":
+                return invoice
+            raise AssertionError(f"Unexpected doctype {doctype}")
+
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=True,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_doc",
+            side_effect=fake_get_doc,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_all",
+            return_value=[],
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            return_value=None,
+        ):
+            checkout_request = build_checkout_request("ACC-PRQ-2026-00007", settings)
+
+        self.assertEqual(checkout_request["checkout_kwargs"]["amount"], 25)

@@ -188,6 +188,10 @@ def _get_checkout_amount_from_item_row(item_row):
     return None
 
 
+def _has_checkout_amount(checkout_kwargs):
+    return flt(checkout_kwargs.get("amount")) > 0
+
+
 def _get_available_item_fields(item_doctype):
     requested_fields = [
         "item_code",
@@ -276,7 +280,7 @@ def _apply_reference_checkout_data(payment_request, checkout_kwargs, settings):
                         )
                     }
 
-                if outstanding_amount > 0:
+                if outstanding_amount > 0 and not _has_checkout_amount(checkout_kwargs):
                     checkout_kwargs["amount"] = outstanding_amount
 
             elif reference_doctype == "Sales Invoice":
@@ -290,7 +294,7 @@ def _apply_reference_checkout_data(payment_request, checkout_kwargs, settings):
                         )
                     }
 
-                if outstanding_amount > 0:
+                if outstanding_amount > 0 and not _has_checkout_amount(checkout_kwargs):
                     checkout_kwargs["amount"] = outstanding_amount
         except Exception as exc:
             frappe.log_error(f"Error checking payment status: {str(exc)}", "LemonSqueezy")

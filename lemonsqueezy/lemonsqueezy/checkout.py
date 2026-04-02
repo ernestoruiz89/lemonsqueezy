@@ -188,6 +188,18 @@ def _get_checkout_amount_from_item_row(item_row):
     return None
 
 
+def _get_available_item_fields(item_doctype):
+    requested_fields = [
+        "item_code",
+        "subscription_plan",
+        "net_amount",
+        "amount",
+        "base_net_amount",
+        "base_amount",
+    ]
+    return [fieldname for fieldname in requested_fields if frappe.db.has_column(item_doctype, fieldname)]
+
+
 def _apply_sales_document_item_checkout_data(reference_doctype, reference_docname, checkout_kwargs, settings):
     item_doctype = {
         "Sales Invoice": "Sales Invoice Item",
@@ -196,10 +208,14 @@ def _apply_sales_document_item_checkout_data(reference_doctype, reference_docnam
     if not item_doctype:
         return
 
+    item_fields = _get_available_item_fields(item_doctype)
+    if not item_fields:
+        return
+
     items = frappe.get_all(
         item_doctype,
         filters={"parent": reference_docname},
-        fields=["item_code", "subscription_plan", "net_amount", "amount", "base_net_amount", "base_amount"],
+        fields=item_fields,
         order_by="idx asc",
         limit=1,
     )

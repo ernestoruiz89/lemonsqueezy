@@ -206,11 +206,14 @@ class TestPaymentUrlIssuance(FrappeTestCase):
 
         def fake_get_all(doctype, **kwargs):
             if doctype == "Sales Invoice Item":
+                self.assertEqual(
+                    kwargs["fields"],
+                    ["item_code", "net_amount", "amount", "base_net_amount", "base_amount"],
+                )
                 return [
                     frappe._dict(
                         {
                             "item_code": "ITEM-001",
-                            "subscription_plan": None,
                             "net_amount": 99,
                             "amount": 108,
                             "base_net_amount": 99,
@@ -228,6 +231,9 @@ class TestPaymentUrlIssuance(FrappeTestCase):
         with patch(
             "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
             return_value=True,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.has_column",
+            side_effect=lambda doctype, fieldname: fieldname != "subscription_plan",
         ), patch(
             "lemonsqueezy.lemonsqueezy.checkout.frappe.get_doc",
             side_effect=fake_get_doc,

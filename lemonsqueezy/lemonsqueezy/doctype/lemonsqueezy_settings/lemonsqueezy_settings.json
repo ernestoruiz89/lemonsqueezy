@@ -82,14 +82,14 @@
             "fieldname": "verbose_logging",
             "fieldtype": "Check",
             "label": "Enable Verbose Logging",
-            "description": "Enable detailed debug logging for troubleshooting"
+            "description": "Enable detailed debug logging temporarily for controlled troubleshooting"
         },
         {
-            "default": "0",
+            "default": "1",
             "fieldname": "sanitize_webhook_payload",
             "fieldtype": "Check",
             "label": "Sanitize Webhook Payload",
-            "description": "Remove sensitive data (emails, addresses) from stored webhook logs"
+            "description": "Enabled by default. Redacts sensitive data from stored webhook logs"
         }
     ],
     "issingle": 0,

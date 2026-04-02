@@ -78,6 +78,7 @@ bench restart
    - **Webhook Secret**: Paste the webhook signing secret
    - **Default Variant ID** (optional): Variant ID for generic payments
 3. Save the document
+4. Leave **Sanitize Webhook Payload** enabled unless you are doing a tightly controlled troubleshooting session
 
 ---
 
@@ -216,7 +217,7 @@ Payment gateway configuration.
 Stores subscription information synchronized from LemonSqueezy.
 
 ### LemonSqueezy Webhook Log
-Log of all received webhooks with their payload and status.
+Log of received webhooks with sanitized payloads and processing status.
 
 ---
 
@@ -224,7 +225,8 @@ Log of all received webhooks with their payload and status.
 
 - ✅ HMAC signature validation on webhooks
 - ✅ Secure API key storage (Password fields)
-- ✅ Error logging without exposing sensitive data
+- ✅ Webhook payload sanitization enabled by default
+- ✅ Verbose logging kept off by default for controlled troubleshooting only
 - ⚠️ **Recommendation**: Implement rate limiting in production
 
 ---

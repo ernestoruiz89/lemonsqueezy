@@ -1,2 +1,3 @@
 lemonsqueezy.patches.add_lemonsqueezy_variant_id_to_item
 lemonsqueezy.patches.migrate_settings_to_password_fields
+lemonsqueezy.patches.enable_webhook_payload_sanitization_by_default

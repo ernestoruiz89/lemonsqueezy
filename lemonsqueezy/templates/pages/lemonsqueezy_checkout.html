@@ -20,6 +20,13 @@
                 <a href="javascript:history.back()" class="btn btn-secondary mt-3">
                     <i class="fa fa-arrow-left"></i> {{ _("Go Back") }}
                 </a>
+                {% elif redirect_url %}
+                <div class="alert alert-info mt-4">
+                    {{ _("Redirecting...") }}
+                </div>
+                <script>
+                    window.location.replace({{ redirect_url | tojson }});
+                </script>
                 {% else %}
                 <div id="loading-state" class="mt-4">
                     <div class="spinner-border text-primary" role="status">

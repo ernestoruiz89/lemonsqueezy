@@ -6,6 +6,9 @@
     "engine": "InnoDB",
     "field_order": [
         "event_name",
+        "idempotency_key",
+        "resource_id",
+        "payment_entry",
         "status",
         "error_message",
         "payload"
@@ -18,10 +21,30 @@
             "read_only": 1
         },
         {
+            "fieldname": "idempotency_key",
+            "fieldtype": "Data",
+            "label": "Idempotency Key",
+            "read_only": 1,
+            "unique": 1
+        },
+        {
+            "fieldname": "resource_id",
+            "fieldtype": "Data",
+            "label": "Resource ID",
+            "read_only": 1
+        },
+        {
+            "fieldname": "payment_entry",
+            "fieldtype": "Link",
+            "label": "Payment Entry",
+            "options": "Payment Entry",
+            "read_only": 1
+        },
+        {
             "fieldname": "status",
             "fieldtype": "Select",
             "label": "Status",
-            "options": "Success\nFailed",
+            "options": "Processing\nSuccess\nFailed",
             "read_only": 1
         },
         {

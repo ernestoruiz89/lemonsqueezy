@@ -1,10 +1,10 @@
 import frappe
 import requests
-import json
 from frappe.model.document import Document
 from frappe import _
-from frappe.utils import get_url, cint, flt
-from urllib.parse import urlencode
+from frappe.utils import cint, flt
+
+from lemonsqueezy.lemonsqueezy.checkout import get_checkout_redirect_url, issue_checkout_token
 
 # LemonSqueezy supported currencies
 SUPPORTED_CURRENCIES = [
@@ -97,9 +97,17 @@ class LemonSqueezySettings(Document):
         Returns the URL to the local checkout page.
         """
         try:
-            url = get_url(f"/api/method/lemonsqueezy.lemonsqueezy.api.lemonsqueezy_checkout?{urlencode(kwargs)}")
-            frappe.log_error(f"Generated Payment URL: {url}\nArgs: {kwargs}", "LemonSqueezy Debug")
-            return url
+            if kwargs.get("reference_doctype") != "Payment Request" or not kwargs.get("reference_docname"):
+                frappe.throw(
+                    _("LemonSqueezy checkout links can only be generated from a Payment Request.")
+                )
+
+            payment_request_name = kwargs.get("reference_docname")
+            if not frappe.db.exists("Payment Request", payment_request_name):
+                frappe.throw(_("Payment Request {0} was not found.").format(payment_request_name))
+
+            token = issue_checkout_token(payment_request_name, self.name)
+            return get_checkout_redirect_url(token)
         except Exception as e:
             frappe.log_error(f"Error generating payment URL: {str(e)}", "LemonSqueezy Error")
             return None
@@ -200,12 +208,18 @@ class LemonSqueezySettings(Document):
             frappe.log_error("LemonSqueezy API Timeout")
             frappe.throw(_("Request timeout. Please try again."))
         except requests.exceptions.HTTPError as e:
-            error_detail = e.response.text if hasattr(e.response, 'text') else str(e)
-            # Use explicit title and message to avoid length issues
-            frappe.log_error(message=f"LemonSqueezy API Error: {error_detail[:500]}", title="LemonSqueezy API Error")
+            status_code = getattr(e.response, "status_code", "unknown")
+            request_id = getattr(e.response, "headers", {}).get("X-Request-Id", "n/a") if getattr(e, "response", None) else "n/a"
+            frappe.log_error(
+                message=f"LemonSqueezy API Error: status={status_code}, request_id={request_id}",
+                title="LemonSqueezy API Error",
+            )
             frappe.throw(_("Failed to create LemonSqueezy checkout. Please check Error Log for details."))
         except Exception as e:
-            frappe.log_error(message=f"LemonSqueezy Checkout Error: {str(e)[:500]}", title="LemonSqueezy Checkout Error")
+            frappe.log_error(
+                message=f"LemonSqueezy Checkout Error: {type(e).__name__}",
+                title="LemonSqueezy Checkout Error",
+            )
             frappe.throw(_("Failed to create LemonSqueezy checkout. Please check Error Log."))
 
     def get_customer_portal_url(self, subscription_id):
@@ -231,12 +245,90 @@ class LemonSqueezySettings(Document):
             frappe.log_error(f"LemonSqueezy Error: {str(e)}")
             frappe.throw(_("Failed to get Customer Portal URL: {0}").format(str(e)))
 
+def _normalize_email(value):
+    """Normalize user-facing email values before comparing ownership."""
+    return (value or "").strip().lower()
+
+def _get_customer_names_for_user(user_email):
+    """Resolve every Customer linked to the given user email."""
+    normalized_email = _normalize_email(user_email)
+    if not normalized_email:
+        return set()
+
+    customers = {
+        row.name
+        for row in frappe.get_all("Customer", filters={"email_id": normalized_email}, fields=["name"])
+        if row.name
+    }
+
+    linked_customers = frappe.db.sql(
+        """
+        SELECT DISTINCT dl.link_name
+        FROM `tabContact` c
+        JOIN `tabContact Email` ce ON ce.parent = c.name
+        JOIN `tabDynamic Link` dl ON dl.parent = c.name
+        WHERE ce.email_id = %s
+        AND dl.link_doctype = 'Customer'
+        """,
+        (normalized_email,),
+        as_dict=1,
+    )
+
+    customers.update(row.link_name for row in linked_customers if row.link_name)
+    return customers
+
+def _can_access_customer_portal(subscription, user=None):
+    """Allow admins or the user/customer that owns the subscription."""
+    user = user or frappe.session.user
+    if not user or user == "Guest":
+        return False
+
+    if "System Manager" in frappe.get_roles(user):
+        return True
+
+    if frappe.has_permission("LemonSqueezy Subscription", doc=subscription, ptype="read", user=user):
+        return True
+
+    user_email = _normalize_email(frappe.db.get_value("User", user, "email") or user)
+    if not user_email:
+        return False
+
+    if _normalize_email(getattr(subscription, "customer_email", None)) == user_email:
+        return True
+
+    subscription_customer = getattr(subscription, "customer", None)
+    if subscription_customer and subscription_customer in _get_customer_names_for_user(user_email):
+        return True
+
+    return False
+
 @frappe.whitelist()
 def get_customer_portal_url_api(subscription_id):
     """
     Whitelist method to get customer portal URL
     Can be called from frontend
     """
+    subscription_id = str(subscription_id or "").strip()
+    if not subscription_id:
+        frappe.throw(_("Subscription ID is required"))
+
+    user = frappe.session.user
+    is_system_manager = bool(user and user != "Guest" and "System Manager" in frappe.get_roles(user))
+    subscription_name = frappe.db.get_value(
+        "LemonSqueezy Subscription",
+        {"subscription_id": subscription_id},
+        "name",
+    )
+
+    if not subscription_name:
+        if is_system_manager:
+            frappe.throw(_("Subscription {0} was not found.").format(subscription_id))
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    subscription = frappe.get_doc("LemonSqueezy Subscription", subscription_name)
+    if not _can_access_customer_portal(subscription, user=user):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
     # Get any enabled LemonSqueezy Settings
     settings = frappe.get_all("LemonSqueezy Settings", filters={"enabled": 1}, limit=1)
     if not settings:

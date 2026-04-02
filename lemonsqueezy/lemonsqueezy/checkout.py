@@ -200,6 +200,16 @@ def _get_available_item_fields(item_doctype):
     return [fieldname for fieldname in requested_fields if frappe.db.has_column(item_doctype, fieldname)]
 
 
+def _get_item_variant_id(item_code):
+    if not item_code:
+        return None
+
+    if not frappe.db.has_column("Item", "lemonsqueezy_variant_id"):
+        return None
+
+    return frappe.db.get_value("Item", item_code, "lemonsqueezy_variant_id")
+
+
 def _apply_sales_document_item_checkout_data(reference_doctype, reference_docname, checkout_kwargs, settings):
     item_doctype = {
         "Sales Invoice": "Sales Invoice Item",
@@ -226,13 +236,13 @@ def _apply_sales_document_item_checkout_data(reference_doctype, reference_docnam
     item_amount = _get_checkout_amount_from_item_row(item_row)
     item_variant_id = None
 
-    if item_row.item_code:
-        item_variant_id = frappe.db.get_value("Item", item_row.item_code, "lemonsqueezy_variant_id")
+    if item_row.get("item_code"):
+        item_variant_id = _get_item_variant_id(item_row.get("item_code"))
 
-    if not item_variant_id and item_row.subscription_plan:
+    if not item_variant_id and item_row.get("subscription_plan"):
         item_variant_id = frappe.db.get_value(
             "Subscription Plan",
-            item_row.subscription_plan,
+            item_row.get("subscription_plan"),
             "product_price_id",
         )
 

@@ -248,3 +248,82 @@ class TestPaymentUrlIssuance(FrappeTestCase):
 
         self.assertEqual(checkout_request["checkout_kwargs"]["variant_id"], "VAR-001")
         self.assertEqual(checkout_request["checkout_kwargs"]["amount"], 99)
+
+    def test_build_checkout_request_falls_back_when_item_custom_field_is_missing(self):
+        payment_request = frappe._dict(
+            {
+                "name": "PR-0001",
+                "status": "Requested",
+                "reference_doctype": "Sales Invoice",
+                "reference_name": "SINV-0001",
+                "currency": "USD",
+                "grand_total": 120,
+                "payment_amount": 120,
+                "total_amount_to_pay": 120,
+            }
+        )
+        invoice = frappe._dict(
+            {
+                "outstanding_amount": 120,
+                "status": "Unpaid",
+            }
+        )
+        settings = SimpleNamespace(verbose_logging=False)
+
+        def fake_get_doc(doctype, name):
+            if doctype == "Payment Request":
+                return payment_request
+            if doctype == "Sales Invoice":
+                return invoice
+            raise AssertionError(f"Unexpected doctype {doctype}")
+
+        def fake_get_all(doctype, **kwargs):
+            if doctype == "Sales Invoice Item":
+                self.assertEqual(
+                    kwargs["fields"],
+                    ["item_code", "subscription_plan", "net_amount", "amount", "base_net_amount", "base_amount"],
+                )
+                return [
+                    frappe._dict(
+                        {
+                            "item_code": "ITEM-001",
+                            "subscription_plan": "PLAN-001",
+                            "net_amount": 99,
+                            "amount": 108,
+                            "base_net_amount": 99,
+                            "base_amount": 108,
+                        }
+                    )
+                ]
+            return []
+
+        def fake_get_value(doctype, name=None, fieldname=None, **kwargs):
+            if doctype == "Subscription Plan" and name == "PLAN-001" and fieldname == "product_price_id":
+                return "VAR-PLAN-001"
+            return None
+
+        def fake_has_column(doctype, fieldname):
+            if doctype == "Item" and fieldname == "lemonsqueezy_variant_id":
+                return False
+            return True
+
+        with patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.exists",
+            return_value=True,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.has_column",
+            side_effect=fake_has_column,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_doc",
+            side_effect=fake_get_doc,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.get_all",
+            side_effect=fake_get_all,
+        ), patch(
+            "lemonsqueezy.lemonsqueezy.checkout.frappe.db.get_value",
+            side_effect=fake_get_value,
+        ):
+            checkout_request = build_checkout_request("PR-0001", settings)
+
+        self.assertEqual(checkout_request["checkout_kwargs"]["variant_id"], "VAR-PLAN-001")
+        self.assertEqual(checkout_request["checkout_kwargs"]["amount"], 99)
